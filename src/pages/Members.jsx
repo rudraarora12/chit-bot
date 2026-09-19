@@ -1,48 +1,65 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Navbar } from '@/components/landing/Navbar';
 import { MemberStats } from '@/components/members/MemberStats';
-import { MemberFilters } from '@/components/members/MemberFilters';
 import { MembersTable } from '@/components/members/MembersTable';
 import { AddMemberModal } from '@/components/members/AddMemberModal';
-import { mockMembers, memberSummary } from '@/data/members';
+import { memberService } from '@/services/memberService';
 import './Members.css';
 
 const PAYMENT_OPTIONS = ['All', 'Paid', 'Pending', 'Overdue'];
 const RISK_OPTIONS = ['All Risk', 'Low', 'Medium', 'High'];
 
 export default function Members() {
-  const [members, setMembers] = useState(mockMembers);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [riskFilter, setRiskFilter] = useState('All Risk');
   const [showModal, setShowModal] = useState(false);
 
-  const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q);
-      const matchesPayment =
-        paymentFilter === 'All' || m.paymentStatus === paymentFilter;
-      const matchesRisk =
-        riskFilter === 'All Risk' || m.risk === riskFilter;
-      return matchesSearch && matchesPayment && matchesRisk;
-    });
-  }, [members, search, paymentFilter, riskFilter]);
+  const loadMembers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await memberService.fetchMembers({
+        search,
+        paymentStatus: paymentFilter,
+        riskLevel: riskFilter,
+      });
+      setMembers(res.data || []);
+    } catch (err) {
+      console.error('Error fetching members:', err);
+      setError('Unable to load members. Please check that the backend is running.');
+      setMembers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, paymentFilter, riskFilter]);
+
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
 
   // Count per filter for badge display
   const paymentCounts = useMemo(() => {
-    const counts = { All: members.length };
+    const counts = { All: members.length, Paid: 0, Pending: 0, Overdue: 0 };
     for (const m of members) {
-      counts[m.paymentStatus] = (counts[m.paymentStatus] || 0) + 1;
+      if (m.paymentStatus) {
+        counts[m.paymentStatus] = (counts[m.paymentStatus] || 0) + 1;
+      }
     }
     return counts;
   }, [members]);
 
   const riskCounts = useMemo(() => {
-    const counts = { 'All Risk': members.length };
+    const counts = { 'All Risk': members.length, Low: 0, Medium: 0, High: 0 };
     for (const m of members) {
-      counts[m.risk] = (counts[m.risk] || 0) + 1;
+      const r = m.riskLevel || m.risk;
+      if (r) {
+        counts[r] = (counts[r] || 0) + 1;
+      }
     }
     return counts;
   }, [members]);
@@ -51,13 +68,20 @@ export default function Members() {
     setMembers((prev) => [newMember, ...prev]);
   }
 
-  const dynamicSummary = {
-    ...memberSummary,
-    totalMembers: members.length,
-  };
+  const dynamicSummary = useMemo(() => {
+    const totalContributed = members.reduce((sum, m) => sum + (m.contributed || 0), 0);
+    const pendingPayments = members.reduce((sum, m) => sum + (m.pending || 0), 0);
+    const riskAlerts = members.filter((m) => (m.riskLevel || m.risk) === 'High').length;
 
-  const isFiltered =
-    search !== '' || paymentFilter !== 'All' || riskFilter !== 'All Risk';
+    return {
+      totalMembers: members.length,
+      totalContributions: `₹${totalContributed.toLocaleString('en-IN')}`,
+      pendingPayments: `₹${pendingPayments.toLocaleString('en-IN')}`,
+      riskAlerts: riskAlerts,
+    };
+  }, [members]);
+
+  const isFiltered = search !== '' || paymentFilter !== 'All' || riskFilter !== 'All Risk';
 
   return (
     <div className="members-page">
@@ -151,7 +175,7 @@ export default function Members() {
                   type="button"
                 >
                   {f === 'All Risk' ? 'All' : f}
-                  <span className="members-page__filter-count">{riskCounts[f === 'All Risk' ? 'All Risk' : f] ?? 0}</span>
+                  <span className="members-page__filter-count">{riskCounts[f] ?? 0}</span>
                 </button>
               ))}
             </div>
@@ -172,22 +196,60 @@ export default function Members() {
           <div className="members-page__meta-row">
             <p className="members-page__count">
               {isFiltered
-                ? <><strong>{filteredMembers.length}</strong> result{filteredMembers.length !== 1 ? 's' : ''} of <strong>{members.length}</strong> members</>
+                ? <><strong>{members.length}</strong> result{members.length !== 1 ? 's' : ''} found</>
                 : <><strong>{members.length}</strong> members total</>
               }
             </p>
             <div className="members-page__risk-summary">
               <span className="members-page__risk-pill members-page__risk-pill--high">
-                ⚠ {members.filter(m => m.risk === 'High').length} High Risk
+                ⚠ {members.filter(m => (m.riskLevel || m.risk) === 'High').length} High Risk
               </span>
               <span className="members-page__risk-pill members-page__risk-pill--medium">
-                {members.filter(m => m.risk === 'Medium').length} Medium
+                {members.filter(m => (m.riskLevel || m.risk) === 'Medium').length} Medium
               </span>
             </div>
           </div>
 
-          {/* ── Table ── */}
-          <MembersTable members={filteredMembers} />
+          {/* ── Dynamic Content: Loading / Error / Empty State / Table ── */}
+          {loading ? (
+            <div className="members-page__loading" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+              <p style={{ fontSize: '1rem', fontWeight: 500 }}>Loading members...</p>
+            </div>
+          ) : error ? (
+            <div className="members-page__error" style={{ padding: '3rem', textAlign: 'center', color: '#ef4444' }}>
+              <p style={{ fontSize: '1rem', fontWeight: 600 }}>{error}</p>
+            </div>
+          ) : members.length === 0 && !isFiltered ? (
+            <div
+              className="members-page__empty-state"
+              style={{
+                padding: '4rem 2rem',
+                textAlign: 'center',
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                margin: '1.5rem 0',
+              }}
+            >
+              <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>👥</div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.5rem' }}>
+                No members yet
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
+                Add your first member to start tracking contributions and payments.
+              </p>
+              <button
+                className="members-page__add-btn"
+                type="button"
+                onClick={() => setShowModal(true)}
+                style={{ margin: '0 auto' }}
+              >
+                + Add Member
+              </button>
+            </div>
+          ) : (
+            <MembersTable members={members} />
+          )}
 
         </div>
       </main>

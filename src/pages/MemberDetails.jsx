@@ -1,7 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/landing/Navbar';
 import { RiskCard } from '@/components/members/RiskCard';
-import { mockMembers } from '@/data/members';
+import { memberService } from '@/services/memberService';
 import './MemberDetails.css';
 
 /* ─── Helpers ─── */
@@ -22,10 +23,11 @@ function RiskBadge({ risk }) {
     Medium: 'mdb-badge mdb-badge--medium',
     High:   'mdb-badge mdb-badge--high',
   };
+  const r = risk || 'Low';
   return (
-    <span className={map[risk] || 'mdb-badge'}>
-      <span className={`mdb-badge__dot mdb-badge__dot--${risk.toLowerCase()}`} aria-hidden="true" />
-      {risk} Risk
+    <span className={map[r] || 'mdb-badge'}>
+      <span className={`mdb-badge__dot mdb-badge__dot--${r.toLowerCase()}`} aria-hidden="true" />
+      {r} Risk
     </span>
   );
 }
@@ -62,7 +64,56 @@ export default function MemberDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const member = mockMembers.find((m) => m.id === id);
+  const [member, setMember] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function loadMember() {
+      if (!id) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await memberService.fetchMemberById(id);
+        setMember(data);
+      } catch (err) {
+        console.error('Error fetching member details:', err);
+        setError('Unable to load member details. Please check that the backend is running.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadMember();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="mdb-page">
+        <Navbar />
+        <main className="mdb-main">
+          <div style={{ padding: '4rem', textAlign: 'center', color: '#64748b' }}>
+            <p style={{ fontSize: '1.1rem', fontWeight: 500 }}>Loading member details...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mdb-page">
+        <Navbar />
+        <main className="mdb-not-found">
+          <div className="mdb-not-found__icon" aria-hidden="true">⚠️</div>
+          <h2 className="mdb-not-found__title">Error Loading Details</h2>
+          <p className="mdb-not-found__sub">{error}</p>
+          <button className="mdb-back-btn" type="button" onClick={() => navigate('/members')}>
+            ← Back to Members
+          </button>
+        </main>
+      </div>
+    );
+  }
 
   if (!member) {
     return (
@@ -238,7 +289,7 @@ export default function MemberDetails() {
                       </thead>
                       <tbody>
                         {member.paymentHistory.map((p, i) => (
-                          <tr key={i} className={`mdb-table__row mdb-table__row--${p.status.toLowerCase()}`}>
+                          <tr key={i} className={`mdb-table__row mdb-table__row--${(p.status || '').toLowerCase()}`}>
                             <td className="mdb-table__mono">{p.date !== '-' ? p.date : <span className="mdb-table__nil">—</span>}</td>
                             <td className="mdb-table__cycle">{p.cycle}</td>
                             <td className="mdb-table__amount">{p.amount}</td>

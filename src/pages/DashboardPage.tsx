@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Show, RedirectToSignIn } from '@clerk/react'
+import type { DashboardData } from '@/data/dashboard'
 import { mockDashboardData } from '@/data/dashboard'
+import { dashboardService } from '@/services/dashboardService'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TopBar } from '@/components/dashboard/TopBar'
 import { QuickActions } from '@/components/dashboard/QuickActions'
@@ -13,7 +15,33 @@ import { RecentLedgerCard } from '@/components/dashboard/RecentLedgerCard'
 
 export default function DashboardPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const data = mockDashboardData
+  const [data, setData] = useState<DashboardData>(mockDashboardData)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadDashboardData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true)
+    setError(null)
+    try {
+      const realData = await dashboardService.fetchDashboardData()
+      setData(realData)
+    } catch (err) {
+      console.error('Error loading real-time dashboard metrics:', err)
+      setError('Unable to connect to live backend. Please verify backend server is running.')
+    } finally {
+      if (isInitial) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadDashboardData(true)
+    // Setup real-time polling every 5 seconds
+    const timer = setInterval(() => {
+      loadDashboardData(false)
+    }, 5000)
+
+    return () => clearInterval(timer)
+  }, [loadDashboardData])
 
   return (
     <>
@@ -44,36 +72,50 @@ export default function DashboardPage() {
                     Organizer Control Center
                   </h2>
                   <p className="mt-1 text-xs text-muted sm:text-sm">
-                    Real-time status of capital collections, reverse auctions, ledger integrity, and AI risk telemetry.
+                    Real-time status of capital collections, reverse auctions, ledger integrity, and AI risk telemetry from MongoDB.
                   </p>
                 </div>
 
                 <QuickActions />
               </div>
 
-              {/* 5 Core Summary Cards */}
-              <SummaryCards stats={data.summaryStats} />
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
+                  {error}
+                </div>
+              )}
 
-              {/* Primary Grid: Current Auction & Collections & Payment Status */}
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                <div className="lg:col-span-7">
-                  <CurrentAuctionCard auction={data.currentAuction} />
+              {loading ? (
+                <div className="py-12 text-center text-muted text-sm font-medium">
+                  Loading real-time MongoDB dashboard metrics...
                 </div>
-                <div className="grid grid-cols-1 gap-6 lg:col-span-5 sm:grid-cols-2 lg:grid-cols-1">
-                  <CollectionOverviewCard collection={data.collectionOverview} />
-                  <PaymentStatusCard status={data.paymentStatus} />
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* 5 Core Summary Cards */}
+                  <SummaryCards stats={data.summaryStats} />
 
-              {/* Secondary Grid: AI Risk Alerts & Recent Activity / Ledger */}
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                <div className="lg:col-span-5">
-                  <RiskAlertsCard alerts={data.riskAlerts} />
-                </div>
-                <div className="lg:col-span-7">
-                  <RecentLedgerCard transactions={data.recentTransactions} />
-                </div>
-              </div>
+                  {/* Primary Grid: Current Auction & Collections & Payment Status */}
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    <div className="lg:col-span-7">
+                      <CurrentAuctionCard auction={data.currentAuction} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-6 lg:col-span-5 sm:grid-cols-2 lg:grid-cols-1">
+                      <CollectionOverviewCard collection={data.collectionOverview} />
+                      <PaymentStatusCard status={data.paymentStatus} />
+                    </div>
+                  </div>
+
+                  {/* Secondary Grid: AI Risk Alerts & Recent Activity / Ledger */}
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    <div className="lg:col-span-5">
+                      <RiskAlertsCard alerts={data.riskAlerts} />
+                    </div>
+                    <div className="lg:col-span-7">
+                      <RecentLedgerCard transactions={data.recentTransactions} />
+                    </div>
+                  </div>
+                </>
+              )}
             </main>
           </div>
         </div>
