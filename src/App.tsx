@@ -27,8 +27,13 @@ export default function App() {
         <Route path="/members" element={<Members />} />
         <Route path="/members/:id" element={<MemberDetails />} />
         <Route path="/risk" element={<RiskPage />} />
+<<<<<<< Updated upstream
         <Route path="/auction" element={<LiveAuctionRoomPage />} />
         <Route path="/ledger" element={<LiveAuctionRoomPage />} />
+=======
+        <Route path="/auction" element={<AuctionPage />} />
+        <Route path="/ledger" element={<AuctionPage />} />
+>>>>>>> Stashed changes
         <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/settings" element={<GroupControlsPage />} />
         <Route path="/subscription" element={<SubscriptionPage />} />

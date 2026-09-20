@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import { LayoutDashboard, Users, Gavel, ShieldAlert, Bot, SlidersHorizontal, X } from 'lucide-react'
+=======
+import { LayoutDashboard, Users, Gavel, ShieldAlert, SlidersHorizontal, Bot, X } from 'lucide-react'
+>>>>>>> Stashed changes
 import { Link, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/landing/Logo'
 
