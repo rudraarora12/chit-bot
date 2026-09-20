@@ -8,11 +8,8 @@ import Members from '@/pages/Members.jsx'
 import MemberDetails from '@/pages/MemberDetails.jsx'
 import RiskPage from '@/pages/RiskPage'
 import AuctionPage from '@/pages/AuctionPage'
-<<<<<<< HEAD
 import AssistantPage from '@/pages/AssistantPage'
-=======
 import GroupControlsPage from '@/pages/GroupControlsPage'
->>>>>>> origin/main
 
 export default function App() {
   return (
@@ -27,11 +24,8 @@ export default function App() {
         <Route path="/risk" element={<RiskPage />} />
         <Route path="/auction" element={<AuctionPage />} />
         <Route path="/ledger" element={<AuctionPage />} />
-<<<<<<< HEAD
         <Route path="/assistant" element={<AssistantPage />} />
-=======
         <Route path="/settings" element={<GroupControlsPage />} />
->>>>>>> origin/main
       </Routes>
     </BrowserRouter>
   )
