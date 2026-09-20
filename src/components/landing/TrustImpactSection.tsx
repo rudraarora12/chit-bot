@@ -1,25 +1,25 @@
-import { History, Scale, ShieldCheck, Database } from 'lucide-react'
-import { trustImpactContent } from '@/data/landing'
+import { Receipt, Gavel, History, Activity, ShieldAlert, BookOpenCheck } from 'lucide-react'
+import { transparencyContent } from '@/data/landing'
 
 export function TrustImpactSection() {
-  const icons = [History, Scale, ShieldCheck, Database]
+  const icons = [Receipt, Gavel, History, Activity, ShieldAlert, BookOpenCheck]
 
   return (
-    <section id="about" className="scroll-mt-24 mx-auto max-w-6xl px-5 py-16 md:py-20">
+    <section id="about" className="scroll-mt-24 mx-auto max-w-6xl px-5 py-16 md:py-20 border-t border-border/70">
       <div className="max-w-2xl">
-        <p className="inline-flex items-center rounded-full border border-emerald/20 bg-emerald/8 px-3.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-emerald-dark uppercase">
-          {trustImpactContent.eyebrow}
+        <p className="inline-flex items-center rounded-full border border-emerald/20 bg-emerald/8 px-3.5 py-1 text-[11px] font-bold tracking-[0.08em] text-emerald-dark uppercase">
+          {transparencyContent.eyebrow}
         </p>
-        <h2 className="mt-4 text-[32px] leading-[1.15] font-bold tracking-[-0.03em] text-navy sm:text-[40px]">
-          {trustImpactContent.heading}
+        <h2 className="mt-4 text-[30px] leading-[1.18] font-extrabold tracking-[-0.03em] text-navy sm:text-[38px]">
+          {transparencyContent.heading}
         </h2>
         <p className="mt-4 text-[15.5px] leading-7 text-muted">
-          {trustImpactContent.subtitle}
+          {transparencyContent.supporting}
         </p>
       </div>
 
-      <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {trustImpactContent.statements.map((item, index) => {
+      <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {transparencyContent.pillars.map((item, index) => {
           const Icon = icons[index % icons.length]
           return (
             <div
@@ -38,9 +38,9 @@ export function TrustImpactSection() {
                 </p>
               </div>
 
-              <div className="mt-6 border-t border-border/60 pt-3.5 flex items-center gap-2 text-[11.5px] font-medium text-muted">
+              <div className="mt-6 border-t border-border/60 pt-3.5 flex items-center gap-2 text-[11.5px] font-semibold text-emerald-dark">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
-                Tamper-evident verification
+                Verified & Transparent
               </div>
             </div>
           )

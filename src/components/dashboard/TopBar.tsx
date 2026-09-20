@@ -1,4 +1,5 @@
-import { Menu } from 'lucide-react'
+import { Menu, Sparkles, ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { UserButton } from '@clerk/react'
 
 interface TopBarProps {
@@ -38,12 +39,29 @@ export function TopBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 sm:gap-4">
+      <div className="flex items-center gap-2.5 sm:gap-3">
+        {/* Mobile Cycle indicator */}
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/20 bg-emerald/10 px-2 py-0.5 text-[10px] font-bold text-emerald-dark sm:hidden">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
           {currentCycle ? `Cycle ${currentCycle}` : 'No active cycle'}
         </span>
 
+        {/* PRO • ₹499/month badge near account profile */}
+        <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-2.5 py-1 text-[11px] font-extrabold text-emerald-dark shadow-xs">
+          <Sparkles className="h-3 w-3 text-emerald" />
+          <span>PRO • ₹499/month</span>
+        </span>
+
+        {/* View Plan button navigating to /subscription */}
+        <Link
+          to="/subscription"
+          className="inline-flex items-center gap-1 rounded-[8px] border border-emerald/30 bg-emerald/5 hover:bg-emerald/15 px-2.5 py-1 text-[11.5px] font-bold text-emerald-dark transition-colors shadow-xs"
+        >
+          <span>View Plan</span>
+          <ArrowRight className="h-3 w-3" />
+        </Link>
+
+        {/* Account Profile Box */}
         <div className="flex items-center gap-2 rounded-full border border-border bg-background p-1 pr-3 pl-1.5">
           <UserButton />
           <span className="hidden text-[13px] font-semibold text-navy md:inline">

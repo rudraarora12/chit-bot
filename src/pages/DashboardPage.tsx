@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Show, RedirectToSignIn } from '@clerk/react'
 import { io } from 'socket.io-client'
+import { Sparkles } from 'lucide-react'
 import type { DashboardData } from '@/data/dashboard'
 import { dashboardService } from '@/services/dashboardService'
 import { Sidebar } from '@/components/dashboard/Sidebar'
@@ -37,7 +38,7 @@ export default function DashboardPage() {
     loadDashboardData(true)
     const socket = io('http://127.0.0.1:5050', { transports: ['websocket', 'polling'] })
     const refresh = () => loadDashboardData(false)
-;['memberCreated', 'memberUpdated', 'memberDeleted', 'paymentUpdated', 'contributionCreated', 'auctionCreated', 'auctionUpdated', 'riskUpdated'].forEach((event) => socket.on(event, refresh))
+    ;['memberCreated', 'memberUpdated', 'memberDeleted', 'paymentUpdated', 'contributionCreated', 'auctionCreated', 'auctionUpdated', 'riskUpdated'].forEach((event) => socket.on(event, refresh))
     return () => { socket.disconnect() }
   }, [loadDashboardData])
 
@@ -64,10 +65,21 @@ export default function DashboardPage() {
               {/* Header Context & Quick Actions Bar */}
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold tracking-tight text-navy">
-                    Organizer Control Center
-                  </h2>
-                  <p className="mt-1 text-xs text-muted sm:text-sm">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h2 className="text-2xl font-bold tracking-tight text-navy">
+                      Organizer Control Center
+                    </h2>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-dark tracking-wide uppercase shadow-xs">
+                      <Sparkles className="h-3 w-3 text-emerald" />
+                      <span>CHITLEDGER PRO</span>
+                      <span className="text-emerald-900">•</span>
+                      <span>₹499/month</span>
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-emerald-800/90 sm:text-xs">
+                    Paid Organizer Plan • Committees • Members • Ledger • Live Auctions • AI Risk Monitoring
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
                     Real-time status of capital collections, reverse auctions, ledger integrity, and AI risk telemetry from MongoDB.
                   </p>
                 </div>
