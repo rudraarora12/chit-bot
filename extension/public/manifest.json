@@ -1,0 +1,7 @@
+{
+  "manifest_version": 3,
+  "name": "ChitLedger Collection Assistant",
+  "version": "0.1.0",
+  "description": "A local UI prototype for reviewing ChitLedger collection reminders in WhatsApp Web.",
+  "content_scripts": [{ "matches": ["https://web.whatsapp.com/*"], "js": ["content.js"], "run_at": "document_idle" }]
+}
