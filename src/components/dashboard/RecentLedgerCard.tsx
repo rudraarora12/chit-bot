@@ -32,7 +32,9 @@ export function RecentLedgerCard({ transactions }: RecentLedgerCardProps) {
 
         {/* Ledger Table */}
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          {transactions.length === 0 ? (
+            <p className="rounded-[12px] border border-border bg-background p-4 text-sm text-muted">No ledger activity yet.</p>
+          ) : <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-border text-[11px] font-semibold text-muted uppercase tracking-wider">
                 <th className="pb-3 pl-1 font-semibold">Date</th>
@@ -95,7 +97,7 @@ export function RecentLedgerCard({ transactions }: RecentLedgerCardProps) {
                 )
               })}
             </tbody>
-          </table>
+          </table>}
         </div>
       </div>
     </article>

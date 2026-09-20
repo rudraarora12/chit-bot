@@ -8,6 +8,7 @@ import Members from '@/pages/Members.jsx'
 import MemberDetails from '@/pages/MemberDetails.jsx'
 import RiskPage from '@/pages/RiskPage'
 import AuctionPage from '@/pages/AuctionPage'
+import AssistantPage from '@/pages/AssistantPage'
 import GroupControlsPage from '@/pages/GroupControlsPage'
 import MemberDashboard from '@/pages/MemberDashboard.jsx'
 import CreateCommitteePage from '@/pages/CreateCommitteePage.jsx'
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/risk" element={<RiskPage />} />
         <Route path="/auction" element={<LiveAuctionRoomPage />} />
         <Route path="/ledger" element={<LiveAuctionRoomPage />} />
+        <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/settings" element={<GroupControlsPage />} />
         <Route path="/subscription" element={<SubscriptionPage />} />
 

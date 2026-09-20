@@ -10,7 +10,6 @@ export interface AuctionBid {
 
 export interface CurrentAuction {
   cycle: number
-  totalCycles: number
   chitAmount: number
   chitAmountFormatted: string
   participants: number
@@ -18,7 +17,7 @@ export interface CurrentAuction {
   highestBidFormatted: string
   estimatedPrizeAmount: number
   prizeAmountFormatted: string
-  status: 'Ready' | 'Live' | 'Completed'
+  status: 'Scheduled' | 'Live' | 'Completed'
   bids: AuctionBid[]
 }
 
@@ -44,7 +43,6 @@ export interface AuctionSummary {
 
 export const initialAuctionData: CurrentAuction = {
   cycle: 8,
-  totalCycles: 12,
   chitAmount: 50000,
   chitAmountFormatted: '₹50,000',
   participants: 12,
@@ -52,7 +50,7 @@ export const initialAuctionData: CurrentAuction = {
   highestBidFormatted: '₹8,500',
   estimatedPrizeAmount: 41500,
   prizeAmountFormatted: '₹41,500',
-  status: 'Live',
+  status: 'Scheduled',
   bids: [
     {
       id: 'bid-1',

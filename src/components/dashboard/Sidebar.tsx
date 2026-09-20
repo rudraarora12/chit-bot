@@ -1,4 +1,8 @@
 import { LayoutDashboard, Users, Gavel, ShieldAlert, SlidersHorizontal, X } from 'lucide-react'
+<<<<<<< Updated upstream
+import { Bot } from 'lucide-react'
+=======
+>>>>>>> Stashed changes
 import { Link, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/landing/Logo'
 
@@ -12,6 +16,10 @@ const navItems = [
   { label: 'Members', href: '/members', icon: Users },
   { label: 'Auction & Ledger', href: '/auction', icon: Gavel },
   { label: 'Risk Monitoring', href: '/risk', icon: ShieldAlert },
+<<<<<<< Updated upstream
+  { label: 'AI Assistant', href: '/assistant', icon: Bot },
+=======
+>>>>>>> Stashed changes
   { label: 'Group Controls', href: '/settings', icon: SlidersHorizontal },
 ]
 
@@ -77,7 +85,7 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarProps) {
             <span className="text-[11px] font-bold tracking-wider uppercase">Chit Ledger Operating</span>
           </div>
           <p className="mt-1 text-[11px] text-muted">
-            Sharma Community Chit • Cycle 8
+            Organizer workflow: members, collections, auctions and risk
           </p>
         </div>
       </div>
@@ -87,7 +95,7 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarProps) {
   return (
     <>
       {/* Desktop Persistent Sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:block">
+      <aside className="hidden h-full w-64 shrink-0 border-r border-border bg-card lg:block">
         {sidebarContent}
       </aside>
 

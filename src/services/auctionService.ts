@@ -1,10 +1,7 @@
-import type { CurrentAuction, LedgerTransaction, AuctionSummary, AuctionBid } from '@/data/auction';
+import type { CurrentAuction, LedgerTransaction, AuctionSummary } from '@/data/auction';
 
 const API_BASE = 'http://127.0.0.1:5050/api';
 
-/**
- * Generate initials from member name (e.g. "Priya Krishnan" -> "PK")
- */
 function getInitials(name: string): string {
   if (!name) return 'M';
   const parts = name.trim().split(/\s+/);
@@ -12,9 +9,6 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/**
- * Generate a deterministic tamper-evident integrity hash for ledger journal
- */
 function generateIntegrityHash(id: string, text: string, amount: number): string {
   let hash = 0;
   const str = `${id}-${text}-${amount}`;
@@ -27,118 +21,171 @@ function generateIntegrityHash(id: string, text: string, amount: number): string
   return `0x${hex.slice(0, 3)}…${hex.slice(3, 6)}`;
 }
 
+const asCycleNumber = (value: unknown): number | null => {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+};
+const toNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const memberKey = (record: any): string | null => {
+  const member = record?.member;
+  if (member?._id) return member._id.toString();
+  if (member?.memberId) return member.memberId.toString();
+  if (typeof member === 'string') return member;
+  return null;
+};
+const dateText = (value: unknown): string => {
+  const date = typeof value === 'string' || typeof value === 'number' || value instanceof Date
+    ? new Date(value)
+    : null;
+  if (!date || isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+const formatCurrency = (value: number): string =>
+  value > 0 ? `₹${value.toLocaleString('en-IN')}` : '—';
+const ledgerStatus = (status: string): 'Completed' | 'Pending' | 'Overdue' =>
+  status === 'Paid' ? 'Completed' : status === 'Late' ? 'Overdue' : (status === 'Pending' ? 'Pending' : 'Overdue');
+
 export interface AuctionPageData {
-  auction: CurrentAuction;
+  auction: CurrentAuction | null;
   transactions: LedgerTransaction[];
   summary: AuctionSummary;
 }
 
 /**
- * Fetch live auction & digital ledger data from MongoDB backend
+ * Fetch live auction, digital ledger and cycle data from the MongoDB backend.
+ * Uses real records only; no fabricated bids, prices or cycle numbers.
  */
 export async function fetchAuctionPageData(): Promise<AuctionPageData> {
-  const [auctionsRes, membersRes, paymentsRes] = await Promise.allSettled([
-    fetch(`${API_BASE}/auctions`).then((res) => (res.ok ? res.json() : null)),
-    fetch(`${API_BASE}/members`).then((res) => (res.ok ? res.json() : null)),
-    fetch(`${API_BASE}/payments`).then((res) => (res.ok ? res.json() : null)),
-  ]);
+  const [auctionsRes, membersRes, paymentsRes, contributionsRes, dashboardRes] =
+    await Promise.allSettled([
+      fetch(`${API_BASE}/auctions`).then((res) => (res.ok ? res.json() : null)),
+      fetch(`${API_BASE}/members`).then((res) => (res.ok ? res.json() : null)),
+      fetch(`${API_BASE}/payments`).then((res) => (res.ok ? res.json() : null)),
+      fetch(`${API_BASE}/contributions`).then((res) => (res.ok ? res.json() : null)),
+      fetch(`${API_BASE}/dashboard`).then((res) => (res.ok ? res.json() : null)),
+    ]);
 
-  const auctionsList = auctionsRes.status === 'fulfilled' && auctionsRes.value?.data ? auctionsRes.value.data : [];
-  const members = membersRes.status === 'fulfilled' && membersRes.value?.data ? membersRes.value.data : [];
-  const paymentsList = paymentsRes.status === 'fulfilled' && paymentsRes.value?.data ? paymentsRes.value.data : [];
+  const auctionsList: any[] =
+    auctionsRes.status === 'fulfilled' && auctionsRes.value?.data ? auctionsRes.value.data : [];
+  const members =
+    membersRes.status === 'fulfilled' && membersRes.value?.data ? membersRes.value.data : [];
+  const paymentsList =
+    paymentsRes.status === 'fulfilled' && paymentsRes.value?.data ? paymentsRes.value.data : [];
+  const contributionsList =
+    contributionsRes.status === 'fulfilled' && contributionsRes.value?.data
+      ? contributionsRes.value.data
+      : [];
+  const currentCycle =
+    dashboardRes.status === 'fulfilled' && dashboardRes.value?.data?.currentCycle
+      ? asCycleNumber(dashboardRes.value.data.currentCycle)
+      : null;
 
-  const participantsCount = members.length;
-  const poolPot = members.reduce((sum: number, m: any) => sum + (m.monthlyContribution || 0), 0);
-  const chitAmount = poolPot > 0 ? poolPot : 50000;
+  const poolAmount = toNumber(auctionsList[0]?.poolAmount);
+  const memberTarget = members.reduce(
+    (sum: number, m: any) => sum + toNumber(m.monthlyContribution),
+    0
+  );
+  const chitAmount = poolAmount > 0 ? poolAmount : memberTarget;
+  const participants =
+    (auctionsList[0]?.participants?.length as number) || members.length;
+  const status = auctionsList[0]?.status || 'Scheduled';
+  const cycle = asCycleNumber(auctionsList[0]?.auctionNumber) || currentCycle;
+  const winningBid = toNumber(auctionsList[0]?.winningBid);
 
-  // Build live bids from MongoDB members
-  const bids: AuctionBid[] = members.map((m: any, idx: number) => {
-    const discount = Math.round((m.monthlyContribution || 5000) * (0.15 + (idx % 3) * 0.05));
-    return {
-      id: `bid-${m._id || idx}`,
-      memberId: m.memberId || m.id || `CL-00${idx + 1}`,
-      memberName: m.name || 'Member',
-      avatarInitials: getInitials(m.name || 'Member'),
-      bidAmount: discount,
-      bidFormatted: `₹${discount.toLocaleString('en-IN')} discount`,
-      timestamp: `${(idx + 1) * 3} mins ago`,
-    };
-  }).sort((a: AuctionBid, b: AuctionBid) => b.bidAmount - a.bidAmount);
+  const auction: CurrentAuction | null = auctionsList[0]
+    ? {
+        cycle: cycle || 0,
+        chitAmount,
+        chitAmountFormatted: formatCurrency(chitAmount),
+        participants,
+        currentHighestBid: winningBid,
+        highestBidFormatted: formatCurrency(winningBid),
+        estimatedPrizeAmount:
+          winningBid > 0 && chitAmount > winningBid ? chitAmount - winningBid : 0,
+        prizeAmountFormatted:
+          winningBid > 0 && chitAmount > winningBid
+            ? formatCurrency(chitAmount - winningBid)
+            : '—',
+        status,
+        bids: [],
+      }
+    : null;
 
-  const highestBid = bids.length > 0 ? bids[0].bidAmount : 0;
-  const estPrize = chitAmount - highestBid;
+  const allPayments = [...paymentsList] as any[];
+  const sortedPayments = allPayments
+    .filter((p) => p.paidDate || p.updatedAt || p.createdAt)
+    .sort(
+      (a, b) =>
+        new Date(b.paidDate || b.updatedAt || b.createdAt).getTime() -
+        new Date(a.paidDate || a.updatedAt || a.createdAt).getTime()
+    );
+  const sortedContributions = [...contributionsList] as any[];
+  const paidKeys = new Set(
+    sortedPayments
+      .filter((p) => p.status === 'Paid')
+      .map((p) => {
+        const key = memberKey(p);
+        return key ? `${key}|${String(p.cycle)}` : null;
+      })
+      .filter(Boolean) as string[]
+  );
 
-  const currentAuctionData = auctionsList.length > 0 ? auctionsList[0] : null;
-
-  const auction: CurrentAuction = {
-    cycle: currentAuctionData?.cycle || 1,
-    totalCycles: currentAuctionData?.totalCycles || 12,
-    chitAmount: chitAmount,
-    chitAmountFormatted: `₹${chitAmount.toLocaleString('en-IN')}`,
-    participants: participantsCount,
-    currentHighestBid: highestBid,
-    highestBidFormatted: `₹${highestBid.toLocaleString('en-IN')}`,
-    estimatedPrizeAmount: estPrize,
-    prizeAmountFormatted: `₹${estPrize.toLocaleString('en-IN')}`,
-    status: currentAuctionData?.status || (participantsCount > 0 ? 'Live' : 'Ready'),
-    bids: bids,
-  };
-
-  // Build Digital Ledger Transactions from Payments & Members
   const transactions: LedgerTransaction[] = [];
 
-  if (Array.isArray(paymentsList) && paymentsList.length > 0) {
-    paymentsList.forEach((p: any, idx: number) => {
-      const m = p.member || {};
-      const statusStr = p.status === 'Paid' ? 'Completed' : p.status === 'Overdue' ? 'Overdue' : 'Pending';
-      const categoryStr = p.status === 'Paid' ? 'contribution' : 'pending';
-      const amountVal = p.amount || 0;
-      const txId = p._id ? `TX-${p._id.toString().slice(-4)}` : `TX-80${idx + 1}`;
-
-      transactions.push({
-        id: txId,
-        date: p.dueDate ? new Date(p.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today',
-        member: m.name || 'Member',
-        memberId: m.memberId || 'CL-000',
-        transaction: p.status === 'Paid' ? 'Contribution' : 'Pending Payment',
-        category: categoryStr as any,
-        amount: `₹${amountVal.toLocaleString('en-IN')}`,
-        rawAmount: amountVal,
-        status: statusStr as any,
-        integrityHash: generateIntegrityHash(txId, m.name || 'Member', amountVal),
-      });
+  for (const contribution of sortedContributions) {
+    const key = `${memberKey(contribution) || '?'}|${String(contribution.cycle)}`;
+    if (paidKeys.has(key)) continue;
+    const amount = toNumber(contribution.amount);
+    const txId = contribution._id ? `TX-${contribution._id.toString().slice(-6)}` : '';
+    transactions.push({
+      id: txId,
+      date: dateText(contribution.date || contribution.createdAt),
+      member: contribution.member?.name || 'Unknown member',
+      memberId: contribution.member?.memberId || '—',
+      transaction: 'Contribution',
+      category: 'contribution',
+      amount: formatCurrency(amount),
+      rawAmount: amount,
+      status: 'Completed',
+      integrityHash: generateIntegrityHash(txId, contribution.member?.name || 'Member', amount),
     });
   }
 
-  // Fallback transaction log derived directly from MongoDB members
-  members.forEach((m: any, idx: number) => {
-    const status = m.paymentStatus === 'Paid' ? 'Completed' : m.paymentStatus === 'Overdue' ? 'Overdue' : 'Pending';
-    const category = m.paymentStatus === 'Paid' ? 'contribution' : 'pending';
-    const txId = `TX-${idx + 101}`;
-    const amountVal = m.monthlyContribution || 5000;
-
+  for (const payment of sortedPayments) {
+    const amount = toNumber(payment.amount);
+    const txId = payment._id ? `TX-${payment._id.toString().slice(-6)}` : '';
+    const completed = payment.status === 'Paid';
     transactions.push({
       id: txId,
-      date: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '20 Sep 2026',
-      member: m.name,
-      memberId: m.memberId || m.id || `CL-00${idx + 1}`,
-      transaction: m.paymentStatus === 'Paid' ? 'Contribution' : 'Pending Payment',
-      category: category as any,
-      amount: `₹${amountVal.toLocaleString('en-IN')}`,
-      rawAmount: amountVal,
-      status: status as any,
-      integrityHash: generateIntegrityHash(txId, m.name, amountVal),
+      date: dateText(payment.paidDate || payment.updatedAt || payment.createdAt),
+      member: payment.member?.name || 'Unknown member',
+      memberId: payment.member?.memberId || '—',
+      transaction: completed ? 'Contribution' : 'Pending Payment',
+      category: completed ? 'contribution' : 'pending',
+      amount: formatCurrency(amount),
+      rawAmount: amount,
+      status: ledgerStatus(payment.status || 'Pending'),
+      integrityHash: generateIntegrityHash(txId, payment.member?.name || 'Member', amount),
     });
-  });
+  }
 
-  const totalCollectedRaw = members.reduce((sum: number, m: any) => sum + (m.totalContributed || m.contributed || 0), 0);
-  const pendingAmountRaw = members.reduce((sum: number, m: any) => sum + (m.pendingAmount || m.pending || 0), 0);
+  const totalCollectedRaw =
+    sortedPayments
+      .filter((p) => p.status === 'Paid')
+      .reduce((sum, p) => sum + toNumber(p.amount), 0);
+
+  const pendingAmountRaw = sortedPayments
+    .filter((p) => ['Pending', 'Overdue', 'Late'].includes(p.status))
+    .reduce((sum, p) => sum + toNumber(p.amount), 0);
 
   const summary: AuctionSummary = {
-    totalCollected: `₹${totalCollectedRaw.toLocaleString('en-IN')}`,
-    pendingAmount: `₹${pendingAmountRaw.toLocaleString('en-IN')}`,
+    totalCollected: formatCurrency(totalCollectedRaw),
+    pendingAmount: formatCurrency(pendingAmountRaw),
     completedTransactions: transactions.filter((t) => t.status === 'Completed').length,
-    currentCycle: `Cycle 1 of 12`,
+    currentCycle: cycle ? `Cycle ${cycle}` : 'No active cycle',
   };
 
   return {
@@ -254,4 +301,3 @@ export const auctionService = {
 };
 
 export default auctionService;
-

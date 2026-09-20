@@ -56,9 +56,7 @@ export default function GroupControlsPage() {
       <div className="flex flex-1 flex-col overflow-x-hidden min-w-0">
         {/* Top Header */}
         <TopBar
-          groupName={state.groupConfig.groupName}
           currentCycle={state.groupConfig.currentCycle}
-          totalCycles={state.groupConfig.totalCycles}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
 

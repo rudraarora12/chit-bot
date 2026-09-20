@@ -1,93 +1,11 @@
 import { CheckCircle2, Clock, AlertCircle } from 'lucide-react'
 import type { PaymentStatusData } from '@/data/dashboard'
 
-interface PaymentStatusCardProps {
-  status: PaymentStatusData
-}
-
-export function PaymentStatusCard({ status }: PaymentStatusCardProps) {
-  return (
-    <article className="flex flex-col justify-between rounded-[16px] border border-border bg-card p-5 shadow-(--shadow-card)">
-      <div>
-        <div className="flex items-center justify-between gap-2 pb-3 border-b border-border">
-          <div>
-            <h3 className="text-base font-bold text-navy">Payment Status</h3>
-            <p className="text-xs text-muted">Cycle 8 member contribution breakdown</p>
-          </div>
-          <span className="text-xs font-bold text-navy">
-            {status.totalMembers} Total Members
-          </span>
-        </div>
-
-        {/* Multi-segmented Progress Bar */}
-        <div className="mt-4">
-          <div className="flex h-3 w-full overflow-hidden rounded-full bg-border p-0.5 gap-0.5">
-            <div
-              className="h-full rounded-l-full bg-emerald transition-all"
-              style={{ width: `${status.paidPercentage}%` }}
-              title={`Paid: ${status.paidCount} members (${status.paidPercentage}%)`}
-            />
-            <div
-              className="h-full bg-amber-500 transition-all"
-              style={{ width: `${status.pendingPercentage}%` }}
-              title={`Pending: ${status.pendingCount} members (${status.pendingPercentage}%)`}
-            />
-            <div
-              className="h-full rounded-r-full bg-rose-500 transition-all"
-              style={{ width: `${status.overduePercentage}%` }}
-              title={`Overdue: ${status.overdueCount} member (${status.overduePercentage}%)`}
-            />
-          </div>
-        </div>
-
-        {/* Status Items */}
-        <div className="mt-5 space-y-2.5">
-          <div className="flex items-center justify-between rounded-[10px] border border-border/80 bg-background p-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald/10 text-emerald">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <span className="font-bold text-navy">Paid</span>
-                <span className="ml-2 text-muted-foreground">{status.paidCount} members</span>
-              </div>
-            </div>
-            <span className="font-mono font-bold text-emerald-dark">
-              {status.paidPercentage.toFixed(1)}%
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between rounded-[10px] border border-border/80 bg-background p-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-                <Clock className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <span className="font-bold text-navy">Pending</span>
-                <span className="ml-2 text-muted-foreground">{status.pendingCount} members</span>
-              </div>
-            </div>
-            <span className="font-mono font-bold text-amber-600">
-              {status.pendingPercentage.toFixed(1)}%
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between rounded-[10px] border border-border/80 bg-background p-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500/10 text-rose-600">
-                <AlertCircle className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <span className="font-bold text-navy">Overdue</span>
-                <span className="ml-2 text-muted-foreground">{status.overdueCount} member</span>
-              </div>
-            </div>
-            <span className="font-mono font-bold text-rose-600">
-              {status.overduePercentage.toFixed(1)}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </article>
-  )
+export function PaymentStatusCard({ status }: { status: PaymentStatusData }) {
+  if (!status.hasData) return <article className="rounded-[16px] border border-border bg-card p-5 shadow-(--shadow-card)"><h3 className="text-base font-bold text-navy">Payment Status</h3><p className="mt-3 text-sm text-muted">No payments recorded for this cycle.</p></article>
+  const paid = Number(((status.paidCount / status.totalMembers) * 100).toFixed(1))
+  const pending = Number(((status.pendingCount / status.totalMembers) * 100).toFixed(1))
+  const overdue = Number((100 - paid - pending).toFixed(1))
+  const rows = [{ label: 'Paid', count: status.paidCount, percent: paid, icon: CheckCircle2, tone: 'text-emerald-dark bg-emerald/10' }, { label: 'Pending', count: status.pendingCount, percent: pending, icon: Clock, tone: 'text-amber-600 bg-amber-500/10' }, { label: 'Overdue', count: status.overdueCount, percent: overdue, icon: AlertCircle, tone: 'text-rose-600 bg-rose-500/10' }]
+  return <article className="rounded-[16px] border border-border bg-card p-5 shadow-(--shadow-card)"><div className="flex justify-between border-b border-border pb-3"><div><h3 className="text-base font-bold text-navy">Payment Status</h3><p className="text-xs text-muted">Current cycle member breakdown</p></div><span className="text-xs font-bold text-navy">{status.totalMembers} members</span></div><div className="mt-4 flex h-3 overflow-hidden rounded-full bg-border"><div className="bg-emerald" style={{ width: `${paid}%` }} /><div className="bg-amber-500" style={{ width: `${pending}%` }} /><div className="bg-rose-500" style={{ width: `${overdue}%` }} /></div><div className="mt-5 space-y-2.5">{rows.map(({ label, count, percent, icon: Icon, tone }) => <div key={label} className="flex items-center justify-between rounded-[10px] border border-border bg-background p-3 text-xs"><div className="flex items-center gap-2.5"><span className={`flex h-6 w-6 items-center justify-center rounded-full ${tone}`}><Icon className="h-3.5 w-3.5" /></span><span className="font-bold text-navy">{label} <span className="ml-1 font-normal text-muted">{count} members</span></span></div><span className="font-mono font-bold text-navy">{percent.toFixed(1)}%</span></div>)}</div></article>
 }
