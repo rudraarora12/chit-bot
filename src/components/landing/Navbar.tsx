@@ -17,15 +17,25 @@ export function Navbar() {
         </Link>
 
         <nav className="hidden items-center gap-7 lg:flex">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-[13.5px] font-medium text-muted transition-colors hover:text-navy"
-            >
-              {link.label}
-            </a>
-          ))}
+          {navLinks.map((link) =>
+            link.href.startsWith('/') ? (
+              <Link
+                key={link.href}
+                to={link.href}
+                className="text-[13.5px] font-medium text-muted transition-colors hover:text-navy"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-[13.5px] font-medium text-muted transition-colors hover:text-navy"
+              >
+                {link.label}
+              </a>
+            )
+          )}
         </nav>
 
         <div className="hidden items-center gap-1.5 lg:flex">
@@ -62,16 +72,27 @@ export function Navbar() {
       {open ? (
         <div className="border-t border-border bg-card px-5 py-4 lg:hidden">
           <nav className="flex flex-col gap-3">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-navy-soft"
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </a>
-            ))}
+            {navLinks.map((link) =>
+              link.href.startsWith('/') ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="text-sm font-medium text-navy-soft hover:text-emerald-dark"
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-medium text-navy-soft"
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </nav>
           <div className="mt-4 flex gap-2">
             <Show when="signed-out">

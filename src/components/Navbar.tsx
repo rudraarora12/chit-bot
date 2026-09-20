@@ -59,6 +59,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </a>
             <a
+              href="/subscription"
+              className="hover:text-slate-900 transition-colors text-emerald-700 font-semibold"
+            >
+              Organize
+            </a>
+            <a
               href="#about"
               className="hover:text-slate-900 transition-colors"
             >
@@ -126,6 +132,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="block py-2 text-base font-medium text-slate-700 hover:text-emerald-600"
           >
             AI Risk Monitoring
+          </a>
+          <a
+            href="/subscription"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2 text-base font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            Organize (Subscription)
           </a>
           <a
             href="#about"

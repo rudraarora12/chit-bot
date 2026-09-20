@@ -1,265 +1,494 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Navbar } from '@/components/landing/Navbar';
-import { MemberStats } from '@/components/members/MemberStats';
-import { MembersTable } from '@/components/members/MembersTable';
-import { AddMemberModal } from '@/components/members/AddMemberModal';
-import { memberService } from '@/services/memberService';
-import './Members.css';
-
-const PAYMENT_OPTIONS = ['All', 'Paid', 'Pending', 'Overdue'];
-const RISK_OPTIONS = ['All Risk', 'Low', 'Medium', 'High'];
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
+import { Navbar } from '@/components/landing/Navbar'
+import { MembersTable } from '@/components/members/MembersTable'
+import { AddMemberModal } from '@/components/members/AddMemberModal'
+import { fetchCommittees, joinCommittee } from '@/services/committeeService'
+import { fetchMembers, createMember } from '@/services/memberService'
+import { getMySubscription } from '@/services/subscriptionService'
+import { useUser } from '@clerk/react'
+import { 
+  Search, 
+  Plus, 
+  Users, 
+  Gavel, 
+  ShieldCheck, 
+  Clock, 
+  CheckCircle2, 
+  ArrowRight, 
+  AlertCircle,
+  Building,
+  UserCheck,
+  TrendingUp,
+  Sparkles
+} from 'lucide-react'
+import './Members.css'
 
 export default function Members() {
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { user } = useUser()
+  const [role, setRole] = useState('member') // 'member' or 'organizer'
+  const [committees, setCommittees] = useState([])
+  const [membersList, setMembersList] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const [search, setSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('All');
-  const [riskFilter, setRiskFilter] = useState('All Risk');
-  const [showModal, setShowModal] = useState(false);
+  // Filters for Member View
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [maxContribFilter, setMaxContribFilter] = useState('All')
 
-  const loadMembers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Modal states
+  const [selectedCommitteeToJoin, setSelectedCommitteeToJoin] = useState(null)
+  const [joinLoading, setJoinLoading] = useState(false)
+  const [joinError, setJoinError] = useState(null)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const res = await memberService.fetchMembers({
-        search,
-        paymentStatus: paymentFilter,
-        riskLevel: riskFilter,
-      });
-      setMembers(res.data || []);
+      const [commRes, membRes] = await Promise.allSettled([
+        fetchCommittees({ search, status: statusFilter }),
+        fetchMembers(),
+      ])
+
+      if (commRes.status === 'fulfilled') {
+        setCommittees(commRes.value.data || [])
+      } else {
+        console.error('Error fetching committees:', commRes.reason)
+        setCommittees([])
+      }
+
+      if (membRes.status === 'fulfilled') {
+        setMembersList(membRes.value.data || [])
+      } else {
+        setMembersList([])
+      }
     } catch (err) {
-      console.error('Error fetching members:', err);
-      setError('Unable to load members. Please check that the backend is running.');
-      setMembers([]);
+      console.error('Error loading data:', err)
+      setError('Unable to connect to backend server. Please verify backend is running.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [search, paymentFilter, riskFilter]);
+  }, [search, statusFilter])
 
   useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
+    loadData()
+    // Real-time polling fallback every 4s
+    const interval = setInterval(() => {
+      fetchCommittees({ search, status: statusFilter }).then((res) => {
+        if (res && res.data) setCommittees(res.data)
+      }).catch(() => {})
+    }, 4000)
 
-  // Count per filter for badge display
-  const paymentCounts = useMemo(() => {
-    const counts = { All: members.length, Paid: 0, Pending: 0, Overdue: 0 };
-    for (const m of members) {
-      if (m.paymentStatus) {
-        counts[m.paymentStatus] = (counts[m.paymentStatus] || 0) + 1;
-      }
+    return () => clearInterval(interval)
+  }, [loadData, search, statusFilter])
+
+  const userEmail = user?.primaryEmailAddress?.emailAddress || ''
+  const userName = user?.fullName || 'Chit Member'
+
+  // Handle joining committee
+  const handleConfirmJoin = async () => {
+    if (!selectedCommitteeToJoin) return
+    setJoinLoading(true)
+    setJoinError(null)
+    try {
+      const updated = await joinCommittee(selectedCommitteeToJoin._id || selectedCommitteeToJoin.id, {
+        name: userName,
+        email: userEmail,
+        phone: user?.primaryPhoneNumber?.phoneNumber || '',
+      })
+      setCommittees((prev) =>
+        prev.map((c) => ((c._id === updated._id || c.id === updated.id) ? updated : c))
+      )
+      setSelectedCommitteeToJoin(null)
+    } catch (err) {
+      console.error('Join error:', err)
+      setJoinError(err.message || 'Failed to join committee.')
+    } finally {
+      setJoinLoading(false)
     }
-    return counts;
-  }, [members]);
-
-  const riskCounts = useMemo(() => {
-    const counts = { 'All Risk': members.length, Low: 0, Medium: 0, High: 0 };
-    for (const m of members) {
-      const r = m.riskLevel || m.risk;
-      if (r) {
-        counts[r] = (counts[r] || 0) + 1;
-      }
-    }
-    return counts;
-  }, [members]);
-
-  function handleAddMember(newMember) {
-    setMembers((prev) => [newMember, ...prev]);
   }
 
-  const dynamicSummary = useMemo(() => {
-    const totalContributed = members.reduce((sum, m) => sum + (m.contributed || 0), 0);
-    const pendingPayments = members.reduce((sum, m) => sum + (m.pending || 0), 0);
-    const riskAlerts = members.filter((m) => (m.riskLevel || m.risk) === 'High').length;
+  const [subscription, setSubscription] = useState(null)
 
-    return {
-      totalMembers: members.length,
-      totalContributions: `₹${totalContributed.toLocaleString('en-IN')}`,
-      pendingPayments: `₹${pendingPayments.toLocaleString('en-IN')}`,
-      riskAlerts: riskAlerts,
-    };
-  }, [members]);
+  useEffect(() => {
+    async function checkSub() {
+      try {
+        const sub = await getMySubscription({ email: userEmail, userId: user?.id })
+        setSubscription(sub)
+      } catch (err) {
+        console.error('Subscription check error:', err)
+      }
+    }
+    checkSub()
+  }, [userEmail, user?.id])
 
-  const isFiltered = search !== '' || paymentFilter !== 'All' || riskFilter !== 'All Risk';
+  const isSubscribed = subscription && subscription.status === 'active' && new Date() < new Date(subscription.endDate)
+
+  // Filtered committees logic
+  const filteredCommittees = useMemo(() => {
+    return committees.filter((c) => {
+      if (maxContribFilter !== 'All') {
+        const val = Number(c.monthlyContribution || 0)
+        if (maxContribFilter === '<5000' && val > 5000) return false
+        if (maxContribFilter === '5000-10000' && (val < 5000 || val > 10000)) return false
+        if (maxContribFilter === '>10000' && val < 10000) return false
+      }
+      return true
+    })
+  }, [committees, maxContribFilter])
 
   return (
     <div className="members-page">
       <Navbar />
+
       <main className="members-page__main">
         <div className="members-page__container">
-
-          {/* ── Breadcrumb ── */}
-          <nav className="members-page__breadcrumb" aria-label="Breadcrumb">
-            <span>ChitLedger</span>
-            <span className="members-page__breadcrumb-sep" aria-hidden="true">/</span>
-            <span className="members-page__breadcrumb-current">Member Management</span>
-          </nav>
-
-          {/* ── Page header ── */}
-          <div className="members-page__header">
-            <div className="members-page__header-left">
-              <h1 className="members-page__title">Member Management</h1>
-              <p className="members-page__subtitle">
-                Track members, contributions, payments and financial risk.
-              </p>
+          {/* ROLE SWITCHER TOOLBAR */}
+          <div className="role-switcher-toolbar">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-emerald" />
+              <span className="text-xs font-bold uppercase tracking-wider text-navy">View Role Mode</span>
             </div>
-            <button
-              className="members-page__add-btn"
-              type="button"
-              onClick={() => setShowModal(true)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add Member
-            </button>
+
+            <div className="role-switcher-toggle">
+              <button
+                type="button"
+                className={`role-toggle-btn ${role === 'member' ? 'role-toggle-btn--active' : ''}`}
+                onClick={() => setRole('member')}
+              >
+                Member View (Find Your Chit)
+              </button>
+              <button
+                type="button"
+                className={`role-toggle-btn ${role === 'organizer' ? 'role-toggle-btn--active-organizer' : ''}`}
+                onClick={() => setRole('organizer')}
+              >
+                Organizer View (Committee Admin)
+              </button>
+            </div>
           </div>
 
-          {/* ── Summary cards ── */}
-          <MemberStats summary={dynamicSummary} />
-
-          {/* ── Filter bar ── */}
-          <div className="members-page__toolbar">
-            {/* Search */}
-            <div className="members-page__search-wrap">
-              <span className="members-page__search-icon" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-              <input
-                className="members-page__search"
-                type="text"
-                placeholder="Search by name or member ID…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search members"
-              />
-              {search && (
-                <button
-                  className="members-page__search-clear"
-                  type="button"
-                  onClick={() => setSearch('')}
-                  aria-label="Clear search"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              )}
+          {/* PAGE HEADER */}
+          <div className="members-page__header">
+            <div>
+              <h1 className="members-page__title">
+                {role === 'member' ? 'Find Your Chit' : 'Chit Committee Management'}
+              </h1>
+              <p className="members-page__subtitle">
+                {role === 'member'
+                  ? 'Explore active chit committees, compare their terms, and join the one that fits you.'
+                  : 'Manage active chit groups, configure contribution rules, and inspect member participation.'}
+              </p>
             </div>
 
-            {/* Payment status filters */}
-            <div className="members-page__filter-group" role="group" aria-label="Filter by payment status">
-              {PAYMENT_OPTIONS.map((f) => (
-                <button
-                  key={f}
-                  className={`members-page__filter-btn${paymentFilter === f ? ' members-page__filter-btn--active' : ''}`}
-                  onClick={() => setPaymentFilter(f)}
-                  type="button"
+            {role === 'organizer' && (
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  to="/subscription"
+                  className={`text-xs px-3 py-2 rounded-xl font-bold border transition-colors ${
+                    isSubscribed 
+                      ? 'bg-emerald/10 text-emerald-dark border-emerald/20 hover:bg-emerald/20' 
+                      : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                  }`}
                 >
-                  {f}
-                  <span className="members-page__filter-count">{paymentCounts[f] ?? 0}</span>
-                </button>
-              ))}
-            </div>
+                  {isSubscribed 
+                    ? `Organizer Plan • Active until ${new Date(subscription.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` 
+                    : 'Organizer Plan • Inactive (₹499/mo)'}
+                </Link>
 
-            {/* Risk filters */}
-            <div className="members-page__filter-group" role="group" aria-label="Filter by risk level">
-              {RISK_OPTIONS.map((f) => (
-                <button
-                  key={f}
-                  className={`members-page__filter-btn${riskFilter === f ? ' members-page__filter-btn--active' : ''}`}
-                  onClick={() => setRiskFilter(f)}
-                  type="button"
+                <Link
+                  to={isSubscribed ? "/committees/create" : "/subscription"}
+                  className="members-page__add-btn"
                 >
-                  {f === 'All Risk' ? 'All' : f}
-                  <span className="members-page__filter-count">{riskCounts[f] ?? 0}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Clear filters */}
-            {isFiltered && (
-              <button
-                className="members-page__clear-btn"
-                type="button"
-                onClick={() => { setSearch(''); setPaymentFilter('All'); setRiskFilter('All Risk'); }}
-              >
-                Clear filters
-              </button>
+                  <Plus className="h-4 w-4" />
+                  <span>+ Create Committee</span>
+                </Link>
+              </div>
             )}
           </div>
 
-          {/* ── Results meta row ── */}
-          <div className="members-page__meta-row">
-            <p className="members-page__count">
-              {isFiltered
-                ? <><strong>{members.length}</strong> result{members.length !== 1 ? 's' : ''} found</>
-                : <><strong>{members.length}</strong> members total</>
-              }
-            </p>
-            <div className="members-page__risk-summary">
-              <span className="members-page__risk-pill members-page__risk-pill--high">
-                ⚠ {members.filter(m => (m.riskLevel || m.risk) === 'High').length} High Risk
-              </span>
-              <span className="members-page__risk-pill members-page__risk-pill--medium">
-                {members.filter(m => (m.riskLevel || m.risk) === 'Medium').length} Medium
-              </span>
+          {error && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-medium">
+              {error}
             </div>
-          </div>
-
-          {/* ── Dynamic Content: Loading / Error / Empty State / Table ── */}
-          {loading ? (
-            <div className="members-page__loading" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-              <p style={{ fontSize: '1rem', fontWeight: 500 }}>Loading members...</p>
-            </div>
-          ) : error ? (
-            <div className="members-page__error" style={{ padding: '3rem', textAlign: 'center', color: '#ef4444' }}>
-              <p style={{ fontSize: '1rem', fontWeight: 600 }}>{error}</p>
-            </div>
-          ) : members.length === 0 && !isFiltered ? (
-            <div
-              className="members-page__empty-state"
-              style={{
-                padding: '4rem 2rem',
-                textAlign: 'center',
-                backgroundColor: '#ffffff',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                margin: '1.5rem 0',
-              }}
-            >
-              <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>👥</div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.5rem' }}>
-                No members yet
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
-                Add your first member to start tracking contributions and payments.
-              </p>
-              <button
-                className="members-page__add-btn"
-                type="button"
-                onClick={() => setShowModal(true)}
-                style={{ margin: '0 auto' }}
-              >
-                + Add Member
-              </button>
-            </div>
-          ) : (
-            <MembersTable members={members} />
           )}
 
+          {/* ============================================================ */}
+          {/* MEMBER VIEW: DISCOVERY FEED & COMMITTEES CARDS */}
+          {/* ============================================================ */}
+          {role === 'member' ? (
+            <>
+              {/* FILTER BAR */}
+              <div className="committees-filter-bar">
+                <div className="search-input-wrap">
+                  <Search className="search-icon-pos h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search committees..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="search-input"
+                  />
+                </div>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Open">Open for Joining</option>
+                  <option value="Full">Full</option>
+                </select>
+
+                <select
+                  value={maxContribFilter}
+                  onChange={(e) => setMaxContribFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="All">All Contribution Amounts</option>
+                  <option value="<5000">Under ₹5,000 / month</option>
+                  <option value="5000-10000">₹5,000 - ₹10,000 / month</option>
+                  <option value=">10000">Above ₹10,000 / month</option>
+                </select>
+              </div>
+
+              {loading ? (
+                <div className="py-16 text-center text-muted text-sm font-medium">
+                  Loading active chit committees from MongoDB...
+                </div>
+              ) : filteredCommittees.length === 0 ? (
+                <div className="empty-committees-box">
+                  <div className="text-4xl mb-3">🤝</div>
+                  <h3 className="text-lg font-bold text-navy mb-1">No active chit committees available</h3>
+                  <p className="text-xs text-muted max-w-md mx-auto mb-4">
+                    New chit committees created by organizers will appear here automatically in real time.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setRole('organizer')}
+                    className="inline-flex items-center gap-2 text-xs font-bold bg-emerald text-white px-4 py-2 rounded-xl"
+                  >
+                    <span>Switch to Organizer View & Create One</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="committees-grid">
+                  {filteredCommittees.map((comm) => {
+                    const availableSlots = Math.max(0, comm.totalMembers - (comm.joinedMembers || 0))
+                    const isUserJoined = comm.members?.some((m) => m.email && m.email.toLowerCase() === userEmail.toLowerCase())
+                    const isFull = availableSlots === 0 || comm.status === 'Full'
+                    const isOrganizer =
+                      (userEmail && comm.organizerEmail && comm.organizerEmail.toLowerCase() === userEmail.toLowerCase()) ||
+                      (user?.id && comm.organizerId && comm.organizerId === user.id) ||
+                      (comm.organizer && comm.organizer.toLowerCase() === (user?.fullName || 'Sharma Organizer').toLowerCase())
+
+                    return (
+                      <div key={comm._id || comm.id} className="committee-card">
+                        <div>
+                          <div className="committee-card-header">
+                            <div>
+                              <h3 className="committee-name">{comm.name}</h3>
+                              <p className="committee-organizer">
+                                {isOrganizer ? (
+                                  <span className="text-indigo-600 font-bold">You created this committee</span>
+                                ) : (
+                                  `Organized by ${comm.organizer || 'Sharma Organizer'}`
+                                )}
+                              </p>
+                            </div>
+                            <span className={isOrganizer ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-bold' : isFull ? 'status-badge-full' : 'status-badge-open'}>
+                              {isOrganizer ? 'Organizer' : isFull ? 'Full' : 'Open'}
+                            </span>
+                          </div>
+
+                          <div className="committee-card-body">
+                            <div className="financial-highlight">
+                              <span className="monthly-contrib">₹{Number(comm.monthlyContribution).toLocaleString('en-IN')}<span className="text-xs font-medium text-slate-500"> / mo</span></span>
+                              <span className="chit-pool-val">₹{Number(comm.totalChitValue).toLocaleString('en-IN')} Chit Value</span>
+                            </div>
+
+                            <div className="capacity-progress-box">
+                              <div className="capacity-text">
+                                <span>{comm.joinedMembers || 0} / {comm.totalMembers} Members</span>
+                                <span className="capacity-slots-avail">{availableSlots} Slots Available</span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald transition-all duration-300"
+                                  style={{ width: `${Math.min(100, Math.round(((comm.joinedMembers || 0) / comm.totalMembers) * 100))}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 mt-3 pt-2 border-t border-slate-100">
+                              <div>Duration: <strong>{comm.durationMonths} Months</strong></div>
+                              <div>Auction: <strong>{comm.auctionFrequency || 'Monthly'}</strong></div>
+                              <div>Starts: <strong>{comm.startDate ? new Date(comm.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Soon'}</strong></div>
+                              <div>Type: <strong>{comm.auctionType || 'Reverse'}</strong></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="committee-card-footer">
+                          <Link to={`/committees/${comm._id || comm.id}`} className="btn-card-details">
+                            View Details
+                          </Link>
+
+                          {isOrganizer ? (
+                            <Link to={`/committees/${comm._id || comm.id}`} className="btn-card-join bg-slate-900 text-white hover:bg-slate-800">
+                              Manage Committee
+                            </Link>
+                          ) : isUserJoined ? (
+                            <Link to="/member/dashboard" className="btn-card-join bg-emerald/20 text-emerald-dark hover:bg-emerald/30">
+                              Open My Chit
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isFull}
+                              onClick={() => setSelectedCommitteeToJoin(comm)}
+                              className="btn-card-join"
+                            >
+                              {isFull ? 'Full' : 'Join Committee'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            /* ============================================================ */
+            /* ORGANIZER VIEW: COMMITTEE ADMIN & MEMBER MANAGEMENT */
+            /* ============================================================ */
+            <div className="space-y-8">
+              {/* ORGANIZER COMMITTEES OVERVIEW */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-navy">Active Chit Groups Managed</h3>
+                    <p className="text-xs text-muted">Real-time status of your organized chit circles</p>
+                  </div>
+                  <Link to="/committees/create" className="text-xs font-bold text-emerald hover:underline">
+                    + Create Another Circle
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {committees.map((comm) => (
+                    <div key={comm._id || comm.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-bold text-navy text-sm">{comm.name}</h4>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald/10 text-emerald-dark">
+                            {comm.joinedMembers} / {comm.totalMembers} Joined
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-2">
+                          ₹{Number(comm.monthlyContribution).toLocaleString('en-IN')}/mo • Pool: ₹{Number(comm.totalChitValue).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
+                        <span className="text-[11px] text-slate-500">{comm.durationMonths} Months</span>
+                        <Link to={`/committees/${comm._id || comm.id}`} className="text-xs font-bold text-emerald hover:underline">
+                          Manage Circle →
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* EMBEDDED ORGANIZER MEMBER MANAGEMENT TABLE */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-navy">Global Member Directory</h3>
+                    <p className="text-xs text-muted">All registered members across chit groups</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddMemberModal(true)}
+                    className="px-3 py-1.5 rounded-lg bg-emerald text-white text-xs font-semibold"
+                  >
+                    + Add Member
+                  </button>
+                </div>
+
+                <MembersTable members={membersList} />
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
-      {showModal && (
+      {/* JOIN CONFIRMATION MODAL FOR MEMBER VIEW */}
+      {selectedCommitteeToJoin && (
+        <div className="join-modal-backdrop">
+          <div className="join-modal-card">
+            <h3 className="join-modal-title">Join {selectedCommitteeToJoin.name}?</h3>
+            <p className="text-xs text-muted">
+              Confirm your participation in this community chit group.
+            </p>
+
+            {joinError && (
+              <div className="mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
+                {joinError}
+              </div>
+            )}
+
+            <div className="join-modal-summary">
+              <div className="modal-summary-row">
+                <span className="text-slate-600 font-medium">Monthly Contribution</span>
+                <span className="font-bold text-navy">₹{Number(selectedCommitteeToJoin.monthlyContribution).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="modal-summary-row">
+                <span className="text-slate-600 font-medium">Total Chit Value</span>
+                <span className="font-bold text-emerald-dark">₹{Number(selectedCommitteeToJoin.totalChitValue).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="modal-summary-row">
+                <span className="text-slate-600 font-medium">Duration</span>
+                <span className="font-bold text-navy">{selectedCommitteeToJoin.durationMonths} Months</span>
+              </div>
+              <div className="modal-summary-row">
+                <span className="text-slate-600 font-medium">Capacity</span>
+                <span className="font-bold text-navy">{selectedCommitteeToJoin.joinedMembers} / {selectedCommitteeToJoin.totalMembers} Members</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setSelectedCommitteeToJoin(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={joinLoading}
+                onClick={handleConfirmJoin}
+                className="px-6 py-2.5 rounded-xl bg-emerald hover:bg-emerald-dark text-white font-bold text-xs transition-colors"
+              >
+                {joinLoading ? 'Joining...' : 'Confirm & Join'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddMemberModal && (
         <AddMemberModal
-          onClose={() => setShowModal(false)}
-          onAdd={handleAddMember}
+          onClose={() => setShowAddMemberModal(false)}
+          onAdd={(newM) => setMembersList((prev) => [newM, ...prev])}
         />
       )}
     </div>
-  );
+  )
 }

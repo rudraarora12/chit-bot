@@ -1,4 +1,5 @@
 import { Check, Shield, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { userRolesContent } from '@/data/landing'
 
 export function UserRolesSection() {
@@ -80,10 +81,20 @@ export function UserRolesSection() {
                 </ul>
               </div>
 
-              <div className="mt-8 border-t border-border/70 pt-4 text-[12px] font-medium text-muted">
-                {isOrganiser
-                  ? 'Access to administration, audit ledgers, and live auctions'
-                  : 'Instant access from mobile or desktop browser'}
+              <div className="mt-8 border-t border-border/70 pt-4 text-[12px] font-medium text-muted flex items-center justify-between">
+                <span>
+                  {isOrganiser
+                    ? 'Access to administration, audit ledgers, and live auctions'
+                    : 'Instant access from mobile or desktop browser'}
+                </span>
+                {isOrganiser && (
+                  <Link
+                    to="/subscription"
+                    className="inline-flex items-center gap-1 text-[12px] font-bold text-emerald hover:underline shrink-0 ml-2"
+                  >
+                    <span>Organize & Subscribe →</span>
+                  </Link>
+                )}
               </div>
             </div>
           )

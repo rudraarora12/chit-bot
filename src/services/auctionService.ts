@@ -149,6 +149,74 @@ export async function fetchAuctionPageData(): Promise<AuctionPageData> {
 }
 
 /**
+ * Fetch live reverse auction data for a SPECIFIC COMMITTEE from backend
+ */
+export async function fetchCommitteeAuction(committeeId: string) {
+  const res = await fetch(`${API_BASE}/committees/${committeeId}/auction`);
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to fetch committee auction');
+  }
+  return data;
+}
+
+/**
+ * Start auction for a committee (Organizer Only)
+ */
+export async function startAuction(auctionId: string, durationMinutes = 10) {
+  const res = await fetch(`${API_BASE}/auctions/${auctionId}/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ durationMinutes }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to start auction');
+  }
+  return data.data;
+}
+
+/**
+ * End auction manually or upon timer completion
+ */
+export async function endAuction(auctionId: string) {
+  const res = await fetch(`${API_BASE}/auctions/${auctionId}/end`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to end auction');
+  }
+  return data.data;
+}
+
+/**
+ * Submit reverse bid to live auction
+ */
+export async function submitAuctionBid(
+  auctionId: string,
+  payload: { amount: number; bidderName?: string; bidderEmail?: string; bidderId?: string }
+) {
+  const res = await fetch(`${API_BASE}/auctions/${auctionId}/bids`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-email': payload.bidderEmail || '',
+      'x-user-id': payload.bidderId || '',
+      'x-user-name': payload.bidderName || '',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to submit bid');
+  }
+  return data;
+}
+
+/**
  * Submit an auction winner payout transaction to backend MongoDB
  */
 export async function createAuctionPayout(payoutPayload: {
@@ -178,7 +246,12 @@ export async function createAuctionPayout(payoutPayload: {
 
 export const auctionService = {
   fetchAuctionPageData,
+  fetchCommitteeAuction,
+  startAuction,
+  endAuction,
+  submitAuctionBid,
   createAuctionPayout,
 };
 
 export default auctionService;
+

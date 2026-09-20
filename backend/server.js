@@ -18,6 +18,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const auctionRoutes = require('./routes/auctionRoutes');
 const riskRoutes = require('./routes/riskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const committeeRoutes = require('./routes/committeeRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -77,6 +79,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/auctions', auctionRoutes);
 app.use('/api/risk', riskRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/committees', committeeRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Error Handling Middleware (Catch-all 404 & centralized error handler)
 app.use(notFound);

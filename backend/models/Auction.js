@@ -1,32 +1,81 @@
 const mongoose = require('mongoose');
 
+const bidSubSchema = new mongoose.Schema({
+  bidderId: { type: String },
+  bidderName: { type: String, required: true },
+  maskedName: { type: String },
+  bidderEmail: { type: String },
+  amount: { type: Number, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+
 const auctionSchema = new mongoose.Schema(
   {
+    committee: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Committee',
+    },
+    committeeIdStr: {
+      type: String,
+    },
+    cycle: {
+      type: Number,
+      default: 1,
+    },
     auctionNumber: {
       type: mongoose.Schema.Types.Mixed,
-      required: [true, 'Auction number is required'],
+      default: 1,
     },
     date: {
       type: Date,
-      required: [true, 'Auction date is required'],
+      default: Date.now,
     },
     poolAmount: {
       type: Number,
-      required: [true, 'Pool amount is required'],
+      default: 0,
     },
-    status: {
-      type: String,
-      enum: ['Scheduled', 'Live', 'Completed'],
-      default: 'Scheduled',
+    chitValue: {
+      type: Number,
+      default: 0,
     },
-    winner: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Member',
+    startingBid: {
+      type: Number,
+      default: 0,
+    },
+    currentLowestBid: {
+      type: Number,
+      default: 0,
     },
     winningBid: {
       type: Number,
       default: 0,
     },
+    winningDiscount: {
+      type: Number,
+      default: 0,
+    },
+    durationMinutes: {
+      type: Number,
+      default: 10,
+    },
+    startTime: {
+      type: Date,
+    },
+    endTime: {
+      type: Date,
+    },
+    status: {
+      type: String,
+      enum: ['Upcoming', 'Scheduled', 'Live', 'Ended', 'Completed'],
+      default: 'Upcoming',
+    },
+    winner: {
+      memberId: { type: String },
+      name: { type: String },
+      email: { type: String },
+      maskedName: { type: String },
+    },
+    bids: [bidSubSchema],
     participants: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -40,3 +89,4 @@ const auctionSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model('Auction', auctionSchema);
+
