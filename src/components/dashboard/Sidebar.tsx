@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import { LayoutDashboard, Users, Gavel, ShieldAlert, X } from 'lucide-react'
+=======
+import { LayoutDashboard, Users, Gavel, ShieldAlert, SlidersHorizontal, X } from 'lucide-react'
+>>>>>>> Stashed changes
 import { Link, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/landing/Logo'
 
@@ -12,6 +16,10 @@ const navItems = [
   { label: 'Members', href: '/members', icon: Users },
   { label: 'Auction & Ledger', href: '/auction', icon: Gavel },
   { label: 'Risk Monitoring', href: '/risk', icon: ShieldAlert },
+<<<<<<< Updated upstream
+=======
+  { label: 'Group Controls', href: '/settings', icon: SlidersHorizontal },
+>>>>>>> Stashed changes
 ]
 
 export function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarProps) {
