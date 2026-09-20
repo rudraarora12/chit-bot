@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Show, RedirectToSignIn } from '@clerk/react';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { TopBar } from '@/components/dashboard/TopBar';
-import { mockDashboardData } from '@/data/dashboard';
+import { useCurrentCycle } from '@/hooks/useCurrentCycle';
 import { ChatInput } from '@/components/assistant/ChatInput';
 import { SuggestedPrompts } from '@/components/assistant/SuggestedPrompts';
 import { ChatMessage } from '@/components/assistant/ChatMessage';
@@ -18,7 +18,7 @@ export default function AssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
-  const data = mockDashboardData;
+  const currentCycle = useCurrentCycle();
 
   useEffect(() => {
     const container = chatScrollRef.current;
@@ -71,9 +71,7 @@ export default function AssistantPage() {
             {/* Top Bar Header */}
             <div className="shrink-0">
               <TopBar
-                groupName={data.groupName}
-                currentCycle={data.currentCycle}
-                totalCycles={data.totalCycles}
+                currentCycle={currentCycle}
                 onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
               />
             </div>

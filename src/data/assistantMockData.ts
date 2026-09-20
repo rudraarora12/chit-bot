@@ -1,5 +1,4 @@
 import { mockMembers } from '@/data/members.js'
-import { mockDashboardData } from '@/data/dashboard'
 import { initialAuctionData, initialLedgerTransactions } from '@/data/auction'
 
 export interface Message {
@@ -711,15 +710,13 @@ function executePlan(plan: QueryPlan): { content: string; actions?: ActionButton
       const overdue = mockMembers.filter((m) => m.paymentStatus === 'Overdue')
       const pendingTotal = mockMembers.reduce((sum, m) => sum + m.pending, 0)
       const contributedTotal = mockMembers.reduce((sum, m) => sum + m.contributed, 0)
-      const { currentCycle, totalCycles, groupName, collectionOverview, currentAuction } = mockDashboardData
       return {
         content:
-          `Summary for **${groupName}**, cycle **${currentCycle} of ${totalCycles}**:\n\n` +
+          `Summary from the assistant's local query dataset:\n\n` +
           `• Members in the local register: **${mockMembers.length}** (Paid ${paid.length}, Pending ${pending.length}, Overdue ${overdue.length})\n` +
           `• Pending from member records: **${formatInr(pendingTotal)}**\n` +
           `• Lifetime contributions on record: **${formatInr(contributedTotal)}**\n` +
-          `• Collection this cycle: **${collectionOverview.collectedAmount}** of **${collectionOverview.totalTarget}** (${collectionOverview.percentage}%)\n` +
-          `• Auction: **${currentAuction.status}**, highest bid **${currentAuction.currentHighestBid}**`,
+          `• Use the Organizer Dashboard for live collection and auction metrics.`,
         actions: [{ label: 'View Ledger', href: '/ledger' }, { label: 'View Auction', href: '/auction' }],
       }
     }
@@ -777,7 +774,7 @@ function executePlan(plan: QueryPlan): { content: string; actions?: ActionButton
       if (plan.auctionView === 'next' || plan.auctionView === 'status') {
         return {
           content:
-            `The auction is currently **${initialAuctionData.status}** (Cycle ${initialAuctionData.cycle} of ${initialAuctionData.totalCycles}). ` +
+            `The auction is currently **${initialAuctionData.status}** (Cycle ${initialAuctionData.cycle}). ` +
             `Chit amount ${initialAuctionData.chitAmountFormatted}, ${initialAuctionData.participants} eligible bidders, highest bid ${initialAuctionData.highestBidFormatted}.`,
           actions: [{ label: 'View Auction', href: '/auction' }],
         }
