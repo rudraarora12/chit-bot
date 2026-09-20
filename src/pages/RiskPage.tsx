@@ -12,11 +12,23 @@ import {
   Sparkles,
   ArrowUpRight,
 } from 'lucide-react'
+import { io } from 'socket.io-client'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TopBar } from '@/components/dashboard/TopBar'
 import type { RiskMember } from '@/data/riskData'
-import { mockRiskMembers } from '@/data/riskData'
 import { riskService } from '@/services/riskService'
+import { useCurrentCycle } from '@/hooks/useCurrentCycle'
+
+const REFRESH_EVENTS = [
+  'memberCreated',
+  'memberUpdated',
+  'memberDeleted',
+  'paymentUpdated',
+  'contributionCreated',
+  'auctionCreated',
+  'auctionUpdated',
+  'riskUpdated',
+]
 
 export default function RiskPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -24,18 +36,17 @@ export default function RiskPage() {
   const [riskFilter, setRiskFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All')
   const [selectedMember, setSelectedMember] = useState<RiskMember | null>(null)
 
-  const [members, setMembers] = useState<RiskMember[]>(mockRiskMembers)
+  const [members, setMembers] = useState<RiskMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const currentCycle = useCurrentCycle()
 
   const loadRiskData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true)
     setError(null)
     try {
       const realMembers = await riskService.fetchRiskPageData()
-      if (realMembers && realMembers.length > 0) {
-        setMembers(realMembers)
-      }
+      setMembers(realMembers)
     } catch (err) {
       console.error('Error fetching live risk telemetry:', err)
       setError('Unable to load live risk telemetry. Please verify backend connection.')
@@ -46,10 +57,12 @@ export default function RiskPage() {
 
   useEffect(() => {
     loadRiskData(true)
-    const timer = setInterval(() => {
-      loadRiskData(false)
-    }, 5000)
-    return () => clearInterval(timer)
+    const socket = io('http://127.0.0.1:5050', { transports: ['websocket', 'polling'] })
+    const refresh = () => loadRiskData(false)
+    REFRESH_EVENTS.forEach((event) => socket.on(event, refresh))
+    return () => {
+      socket.disconnect()
+    }
   }, [loadRiskData])
 
   // Dynamically calculated stats from live MongoDB members
@@ -91,9 +104,7 @@ export default function RiskPage() {
       <div className="flex flex-1 flex-col overflow-x-hidden min-w-0">
         {/* Top Header */}
         <TopBar
-          groupName="ChitLedger Control Center"
-          currentCycle={1}
-          totalCycles={12}
+          currentCycle={currentCycle}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
 
@@ -277,7 +288,9 @@ export default function RiskPage() {
               </div>
             ) : filteredMembers.length === 0 ? (
               <div className="py-12 text-center text-muted text-xs font-medium">
-                No members found matching your filter criteria.
+                {members.length === 0
+                  ? 'No members added yet. Risk telemetry will appear once members are onboarded.'
+                  : 'No members found matching your filter criteria.'}
               </div>
             ) : (
               <div className="space-y-3">

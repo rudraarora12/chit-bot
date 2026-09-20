@@ -20,7 +20,7 @@ export function RiskAlertsCard({ alerts }: RiskAlertsCardProps) {
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-navy">AI Risk Monitoring</h2>
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                  3 Signals
+                  {alerts.length} Signal{alerts.length === 1 ? '' : 's'}
                 </span>
               </div>
               <p className="text-xs text-muted">
@@ -45,7 +45,7 @@ export function RiskAlertsCard({ alerts }: RiskAlertsCardProps) {
 
         {/* Risk Alerts Feed */}
         <div className="mt-4 space-y-3">
-          {alerts.map((alert) => {
+          {alerts.length === 0 ? <p className="rounded-[12px] border border-border bg-background p-4 text-sm text-muted">No active risk signals.</p> : alerts.map((alert) => {
             const isHigh = alert.riskLevel === 'High'
 
             return (

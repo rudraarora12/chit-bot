@@ -1,176 +1,45 @@
-import type { DashboardData, RiskAlert, Transaction } from '@/data/dashboard';
+import type { DashboardData, RiskAlert } from '@/data/dashboard'
 
-const API_BASE = 'http://127.0.0.1:5050/api';
-
-/**
- * Generate initials from member name (e.g. "Ravi Kumar" -> "RK")
- */
-function getInitials(name: string): string {
-  if (!name) return 'M';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+const API_BASE = 'http://127.0.0.1:5050/api'
+const formatCurrency = (value: number) =>
+  Number.isFinite(value) && value > 0 ? `₹${value.toLocaleString('en-IN')}` : '—'
+const initials = (name: string) => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+const dateText = (value: unknown) => {
+  const date = value ? new Date(value as string) : null
+  if (!date || isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-/**
- * Fetch real-time aggregated dashboard data from MongoDB backend
- */
 export async function fetchDashboardData(): Promise<DashboardData> {
-  const [statsRes, membersRes, riskRes] = await Promise.allSettled([
-    fetch(`${API_BASE}/dashboard/stats`).then((res) => (res.ok ? res.json() : null)),
-    fetch(`${API_BASE}/members`).then((res) => (res.ok ? res.json() : null)),
-    fetch(`${API_BASE}/risk`).then((res) => (res.ok ? res.json() : null)),
-  ]);
-
-  const statsData = statsRes.status === 'fulfilled' && statsRes.value?.data ? statsRes.value.data : {};
-  const members = membersRes.status === 'fulfilled' && membersRes.value?.data ? membersRes.value.data : [];
-  const riskDocs = riskRes.status === 'fulfilled' && riskRes.value?.data ? riskRes.value.data : [];
-
-  const totalMembers = members.length || statsData.totalMembers || 0;
-  const totalCollectedRaw = members.reduce((sum: number, m: any) => sum + (m.totalContributed || m.contributed || 0), 0) || statsData.totalContributions || 0;
-  const pendingAmountRaw = members.reduce((sum: number, m: any) => sum + (m.pendingAmount || m.pending || 0), 0) || statsData.pendingAmount || 0;
-  const pendingPaymentsCount = members.filter((m: any) => (m.paymentStatus || 'Pending') !== 'Paid').length || statsData.pendingPayments || 0;
-
-  // Build Risk Alerts from MongoDB members or RiskAlert collection
-  const riskAlerts: RiskAlert[] = [];
-  if (Array.isArray(riskDocs) && riskDocs.length > 0) {
-    riskDocs.forEach((r: any, idx: number) => {
-      const m = r.member || {};
-      riskAlerts.push({
-        id: r._id || `risk-${idx}`,
-        memberId: m.memberId || m._id || `CL-${idx}`,
-        memberName: m.name || 'Member',
-        avatarInitials: getInitials(m.name || 'Member'),
-        riskLevel: r.riskLevel || 'Medium',
-        reason: Array.isArray(r.reasons) ? r.reasons[0] : 'Payment delay detected',
-        timestamp: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : 'Recent',
-      });
-    });
-  } else {
-    members.forEach((m: any, idx: number) => {
-      const risk = m.riskLevel || m.risk || 'Low';
-      if (risk === 'High' || risk === 'Medium') {
-        riskAlerts.push({
-          id: m._id || `risk-${idx}`,
-          memberId: m.memberId || m.id || `CL-${idx}`,
-          memberName: m.name || 'Member',
-          avatarInitials: getInitials(m.name || 'Member'),
-          riskLevel: risk as 'High' | 'Medium',
-          reason: Array.isArray(m.riskReasons) && m.riskReasons.length > 0
-            ? m.riskReasons[0]
-            : `${risk} risk profile recorded`,
-          timestamp: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-IN') : 'Active',
-        });
-      }
-    });
-  }
-
-  // Payment Status Distribution
-  const paidCount = members.filter((m: any) => m.paymentStatus === 'Paid').length;
-  const pendingCount = members.filter((m: any) => m.paymentStatus === 'Pending' || !m.paymentStatus).length;
-  const overdueCount = members.filter((m: any) => m.paymentStatus === 'Overdue').length;
-
-  const paidPct = totalMembers > 0 ? Number(((paidCount / totalMembers) * 100).toFixed(1)) : 0;
-  const pendingPct = totalMembers > 0 ? Number(((pendingCount / totalMembers) * 100).toFixed(1)) : 0;
-  const overduePct = totalMembers > 0 ? Number(((overdueCount / totalMembers) * 100).toFixed(1)) : 0;
-
-  // Build Recent Transactions from MongoDB members
-  const recentTransactions: Transaction[] = members.slice(0, 7).map((m: any, idx: number) => ({
-    id: m._id || `tx-${idx}`,
-    date: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
-    member: m.name,
-    activity: m.paymentStatus === 'Paid' ? 'Contribution' : 'Pending Payment',
-    type: m.paymentStatus === 'Paid' ? 'contribution' : 'pending',
-    amount: `₹${(m.monthlyContribution || 0).toLocaleString('en-IN')}`,
-    status: m.paymentStatus === 'Paid' ? 'Completed' : m.paymentStatus === 'Overdue' ? 'Overdue' : 'Pending',
-  }));
-
-  const totalTargetRaw = totalCollectedRaw + pendingAmountRaw;
-  const collectionPct = totalTargetRaw > 0 ? Math.round((totalCollectedRaw / totalTargetRaw) * 100) : 0;
-
+  const response = await fetch(`${API_BASE}/dashboard`)
+  if (!response.ok) throw new Error('Dashboard data is unavailable')
+  const payload = await response.json()
+  const data = payload.data
+  const total = data.paymentStatus.totalMembers
+  const target = Number(data.collection.target)
+  const collected = Number(data.collection.collected)
+  const percentage =
+    Number.isFinite(target) && target > 0 ? Math.round((collected / target) * 100) : 0
+  const riskAlerts: RiskAlert[] = (data.riskAlerts || []).map((alert: any) => ({
+    id: String(alert.id), memberId: String(alert.memberId), memberName: alert.memberName,
+    avatarInitials: initials(alert.memberName), riskLevel: alert.riskLevel,
+    reason: alert.reason, timestamp: dateText(alert.createdAt),
+  }))
   return {
-    groupName: 'ChitLedger Live Control Center',
-    currentCycle: 1,
-    totalCycles: 12,
-
+    currentCycle: data.currentCycle,
     summaryStats: [
-      {
-        id: 'total-members',
-        label: 'Total Members',
-        value: totalMembers.toString(),
-        supportingText: 'Active participants in MongoDB',
-        iconName: 'users',
-      },
-      {
-        id: 'total-collected',
-        label: 'Total Collected',
-        value: `₹${totalCollectedRaw.toLocaleString('en-IN')}`,
-        supportingText: 'Across all member contributions',
-        iconName: 'wallet',
-      },
-      {
-        id: 'current-cycle',
-        label: 'Current Cycle Pool',
-        value: `₹${(members.reduce((acc: number, m: any) => acc + (m.monthlyContribution || 0), 0)).toLocaleString('en-IN')}`,
-        supportingText: 'Monthly contribution total',
-        iconName: 'layers',
-      },
-      {
-        id: 'pending-payments',
-        label: 'Pending Payments',
-        value: `₹${pendingAmountRaw.toLocaleString('en-IN')}`,
-        supportingText: `${pendingPaymentsCount} payment(s) pending`,
-        iconName: 'clock',
-      },
-      {
-        id: 'risk-alerts',
-        label: 'Risk Alerts',
-        value: riskAlerts.length.toString(),
-        supportingText: 'Requires review',
-        iconName: 'shieldAlert',
-      },
+      { id: 'active-members', label: 'Active Members', value: String(data.activeMembers), supportingText: data.activeMembers ? 'Members in this group' : 'No members added yet.', iconName: 'users' },
+      { id: 'cycle-target', label: 'Current Cycle Target', value: target > 0 ? formatCurrency(target) : '—', supportingText: data.currentCycle ? `Cycle ${data.currentCycle}` : 'No active cycle.', iconName: 'layers' },
+      { id: 'collected', label: 'Collected This Cycle', value: data.collection.hasData ? (collected > 0 ? formatCurrency(collected) : '—') : '—', supportingText: data.collection.hasData ? (collected > 0 ? `Cycle ${data.currentCycle} collection` : 'No payments recorded for this cycle.') : 'No payments recorded for this cycle.', iconName: 'wallet' },
+      { id: 'pending', label: 'Pending Collection', value: data.collection.pending === null || data.collection.pending === undefined ? '—' : formatCurrency(Number(data.collection.pending)), supportingText: data.collection.hasData ? `${data.paymentStatus.pending + data.paymentStatus.overdue} member payment(s) open` : 'No payments recorded for this cycle.', iconName: 'clock' },
+      { id: 'risk-alerts', label: 'Risk Alerts', value: String(riskAlerts.length), supportingText: riskAlerts.length ? 'Active signals require review' : 'No active risk signals.', iconName: 'shieldAlert' },
     ],
-
-    currentAuction: {
-      cycle: 1,
-      totalCycles: 12,
-      chitAmount: `₹${(members.reduce((acc: number, m: any) => acc + (m.monthlyContribution || 0), 0)).toLocaleString('en-IN')}`,
-      participantsCount: totalMembers,
-      currentHighestBid: '₹0',
-      estimatedPrizeAmount: `₹${(members.reduce((acc: number, m: any) => acc + (m.monthlyContribution || 0), 0)).toLocaleString('en-IN')}`,
-      status: totalMembers > 0 ? 'Ready' : 'Upcoming',
-      recentBids: [],
-    },
-
-    collectionOverview: {
-      collectedAmount: `₹${totalCollectedRaw.toLocaleString('en-IN')}`,
-      collectedRaw: totalCollectedRaw,
-      pendingAmount: `₹${pendingAmountRaw.toLocaleString('en-IN')}`,
-      pendingRaw: pendingAmountRaw,
-      totalTarget: `₹${totalTargetRaw.toLocaleString('en-IN')}`,
-      percentage: collectionPct,
-      trend: [
-        { label: 'Target', collected: totalCollectedRaw, pending: pendingAmountRaw },
-      ],
-    },
-
-    paymentStatus: {
-      paidCount,
-      paidPercentage: paidPct,
-      pendingCount,
-      pendingPercentage: pendingPct,
-      overdueCount,
-      overduePercentage: overduePct,
-      totalMembers,
-    },
-
+    currentAuction: data.auction ? { ...data.auction, date: dateText(data.auction.date) } : null,
+    collectionOverview: { ...data.collection, target: target > 0 ? target : null, pending: data.collection.pending === null || data.collection.pending === undefined ? null : Number(data.collection.pending), percentage, cycle: data.currentCycle },
+    paymentStatus: { paidCount: data.paymentStatus.paid, pendingCount: data.paymentStatus.pending, overdueCount: data.paymentStatus.overdue, totalMembers: total, hasData: data.paymentStatus.hasData },
     riskAlerts,
-    recentTransactions,
-  };
+    recentTransactions: (data.ledger || []).map((entry: any) => ({ id: entry.id, date: dateText(entry.occurredAt), member: entry.member, activity: entry.activity, amount: formatCurrency(entry.amount), status: entry.status === 'Paid' ? 'Completed' : entry.status })),
+  }
 }
 
-export const dashboardService = {
-  fetchDashboardData,
-};
-
-export default dashboardService;
+export const dashboardService = { fetchDashboardData }

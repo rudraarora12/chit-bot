@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Show, RedirectToSignIn } from '@clerk/react'
+import { io } from 'socket.io-client'
 import type { DashboardData } from '@/data/dashboard'
-import { mockDashboardData } from '@/data/dashboard'
 import { dashboardService } from '@/services/dashboardService'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TopBar } from '@/components/dashboard/TopBar'
@@ -15,7 +15,7 @@ import { RecentLedgerCard } from '@/components/dashboard/RecentLedgerCard'
 
 export default function DashboardPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [data, setData] = useState<DashboardData>(mockDashboardData)
+  const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,12 +35,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData(true)
-    // Setup real-time polling every 5 seconds
-    const timer = setInterval(() => {
-      loadDashboardData(false)
-    }, 5000)
-
-    return () => clearInterval(timer)
+    const socket = io('http://127.0.0.1:5050', { transports: ['websocket', 'polling'] })
+    const refresh = () => loadDashboardData(false)
+;['memberCreated', 'memberUpdated', 'memberDeleted', 'paymentUpdated', 'contributionCreated', 'auctionCreated', 'auctionUpdated', 'riskUpdated'].forEach((event) => socket.on(event, refresh))
+    return () => { socket.disconnect() }
   }, [loadDashboardData])
 
   return (
@@ -57,9 +55,7 @@ export default function DashboardPage() {
           <div className="flex flex-1 flex-col overflow-x-hidden min-w-0">
             {/* Top Bar Header */}
             <TopBar
-              groupName={data.groupName}
-              currentCycle={data.currentCycle}
-              totalCycles={data.totalCycles}
+              currentCycle={data?.currentCycle ?? null}
               onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
             />
 
@@ -89,7 +85,7 @@ export default function DashboardPage() {
                 <div className="py-12 text-center text-muted text-sm font-medium">
                   Loading real-time MongoDB dashboard metrics...
                 </div>
-              ) : (
+              ) : data ? (
                 <>
                   {/* 5 Core Summary Cards */}
                   <SummaryCards stats={data.summaryStats} />
@@ -115,7 +111,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </>
-              )}
+              ) : null}
             </main>
           </div>
         </div>

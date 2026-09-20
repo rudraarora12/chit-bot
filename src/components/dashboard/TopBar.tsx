@@ -2,16 +2,12 @@ import { Menu } from 'lucide-react'
 import { UserButton } from '@clerk/react'
 
 interface TopBarProps {
-  groupName: string
-  currentCycle: number
-  totalCycles: number
+  currentCycle: number | null
   onOpenMobileSidebar: () => void
 }
 
 export function TopBar({
-  groupName,
   currentCycle,
-  totalCycles,
   onOpenMobileSidebar,
 }: TopBarProps) {
   return (
@@ -33,11 +29,11 @@ export function TopBar({
             </h1>
             <span className="hidden items-center gap-1.5 rounded-full border border-emerald/20 bg-emerald/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-dark sm:inline-flex">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
-              Cycle {currentCycle} of {totalCycles}
+              {currentCycle ? `Cycle ${currentCycle}` : 'No active cycle'}
             </span>
           </div>
           <p className="text-[12px] font-medium text-muted">
-            {groupName}
+            ChitLedger Organizer Dashboard
           </p>
         </div>
       </div>
@@ -45,7 +41,7 @@ export function TopBar({
       <div className="flex items-center gap-3 sm:gap-4">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/20 bg-emerald/10 px-2 py-0.5 text-[10px] font-bold text-emerald-dark sm:hidden">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
-          Cycle {currentCycle}
+          {currentCycle ? `Cycle ${currentCycle}` : 'No active cycle'}
         </span>
 
         <div className="flex items-center gap-2 rounded-full border border-border bg-background p-1 pr-3 pl-1.5">

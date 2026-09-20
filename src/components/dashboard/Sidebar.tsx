@@ -77,7 +77,7 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarProps) {
             <span className="text-[11px] font-bold tracking-wider uppercase">Chit Ledger Operating</span>
           </div>
           <p className="mt-1 text-[11px] text-muted">
-            Sharma Community Chit • Cycle 8
+            Organizer workflow: members, collections, auctions and risk
           </p>
         </div>
       </div>
