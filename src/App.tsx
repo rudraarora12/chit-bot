@@ -8,7 +8,10 @@ import Members from '@/pages/Members.jsx'
 import MemberDetails from '@/pages/MemberDetails.jsx'
 import RiskPage from '@/pages/RiskPage'
 import AuctionPage from '@/pages/AuctionPage'
+<<<<<<< Updated upstream
 import AssistantPage from '@/pages/AssistantPage'
+=======
+>>>>>>> Stashed changes
 import GroupControlsPage from '@/pages/GroupControlsPage'
 
 export default function App() {
@@ -24,7 +27,10 @@ export default function App() {
         <Route path="/risk" element={<RiskPage />} />
         <Route path="/auction" element={<AuctionPage />} />
         <Route path="/ledger" element={<AuctionPage />} />
+<<<<<<< Updated upstream
         <Route path="/assistant" element={<AssistantPage />} />
+=======
+>>>>>>> Stashed changes
         <Route path="/settings" element={<GroupControlsPage />} />
       </Routes>
     </BrowserRouter>
