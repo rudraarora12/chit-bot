@@ -1,8 +1,4 @@
-import { LayoutDashboard, Users, Gavel, ShieldAlert, SlidersHorizontal, X } from 'lucide-react'
-<<<<<<< Updated upstream
-import { Bot } from 'lucide-react'
-=======
->>>>>>> Stashed changes
+import { LayoutDashboard, Users, Gavel, ShieldAlert, Bot, SlidersHorizontal, X } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/landing/Logo'
 
@@ -16,10 +12,7 @@ const navItems = [
   { label: 'Members', href: '/members', icon: Users },
   { label: 'Auction & Ledger', href: '/auction', icon: Gavel },
   { label: 'Risk Monitoring', href: '/risk', icon: ShieldAlert },
-<<<<<<< Updated upstream
   { label: 'AI Assistant', href: '/assistant', icon: Bot },
-=======
->>>>>>> Stashed changes
   { label: 'Group Controls', href: '/settings', icon: SlidersHorizontal },
 ]
 
