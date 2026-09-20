@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ShieldAlert,
@@ -11,11 +11,12 @@ import {
   X,
   Sparkles,
   ArrowUpRight,
-  Filter,
 } from 'lucide-react'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TopBar } from '@/components/dashboard/TopBar'
-import { mockRiskMembers, getRiskSummaryStats, type RiskMember } from '@/data/riskData'
+import type { RiskMember } from '@/data/riskData'
+import { mockRiskMembers } from '@/data/riskData'
+import { riskService } from '@/services/riskService'
 
 export default function RiskPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -23,12 +24,52 @@ export default function RiskPage() {
   const [riskFilter, setRiskFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All')
   const [selectedMember, setSelectedMember] = useState<RiskMember | null>(null)
 
-  // Dynamically calculated stats
-  const stats = useMemo(() => getRiskSummaryStats(), [])
+  const [members, setMembers] = useState<RiskMember[]>(mockRiskMembers)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadRiskData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true)
+    setError(null)
+    try {
+      const realMembers = await riskService.fetchRiskPageData()
+      if (realMembers && realMembers.length > 0) {
+        setMembers(realMembers)
+      }
+    } catch (err) {
+      console.error('Error fetching live risk telemetry:', err)
+      setError('Unable to load live risk telemetry. Please verify backend connection.')
+    } finally {
+      if (isInitial) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadRiskData(true)
+    const timer = setInterval(() => {
+      loadRiskData(false)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [loadRiskData])
+
+  // Dynamically calculated stats from live MongoDB members
+  const stats = useMemo(() => {
+    const totalMembers = members.length
+    const highRisk = members.filter((m) => m.riskLevel === 'High').length
+    const mediumRisk = members.filter((m) => m.riskLevel === 'Medium').length
+    const lowRisk = members.filter((m) => m.riskLevel === 'Low').length
+
+    return {
+      totalMembers,
+      lowRisk,
+      mediumRisk,
+      highRisk,
+    }
+  }, [members])
 
   // Filtered members list
   const filteredMembers = useMemo(() => {
-    return mockRiskMembers.filter((m) => {
+    return members.filter((m) => {
       const matchesSearch =
         !search ||
         m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -36,7 +77,7 @@ export default function RiskPage() {
       const matchesRisk = riskFilter === 'All' || m.riskLevel === riskFilter
       return matchesSearch && matchesRisk
     })
-  }, [search, riskFilter])
+  }, [members, search, riskFilter])
 
   return (
     <div className="flex min-h-screen bg-background text-foreground antialiased">
@@ -50,8 +91,8 @@ export default function RiskPage() {
       <div className="flex flex-1 flex-col overflow-x-hidden min-w-0">
         {/* Top Header */}
         <TopBar
-          groupName="Sharma Community Chit"
-          currentCycle={8}
+          groupName="ChitLedger Control Center"
+          currentCycle={1}
           totalCycles={12}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
@@ -71,7 +112,7 @@ export default function RiskPage() {
                   AI Risk Monitoring
                 </h1>
                 <p className="mt-1 text-xs text-muted sm:text-sm">
-                  Monitor unusual member behaviour and review potential risks across active chit cycles.
+                  Monitor unusual member behaviour and review potential risks across active chit cycles in real-time.
                 </p>
               </div>
 
@@ -83,6 +124,12 @@ export default function RiskPage() {
               </div>
             </div>
           </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
+              {error}
+            </div>
+          )}
 
           {/* 2. Risk Summary Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -100,7 +147,7 @@ export default function RiskPage() {
                   {stats.totalMembers}
                 </span>
                 <p className="mt-1 text-xs font-medium text-muted-foreground">
-                  Active in community group
+                  Active in MongoDB database
                 </p>
               </div>
             </article>
@@ -178,7 +225,7 @@ export default function RiskPage() {
               <div>
                 <h2 className="text-lg font-bold text-navy">Member Risk Roster</h2>
                 <p className="text-xs text-muted">
-                  Showing {filteredMembers.length} members matching selected telemetry criteria
+                  Showing {filteredMembers.length} member(s) matching selected telemetry criteria
                 </p>
               </div>
 
@@ -224,108 +271,118 @@ export default function RiskPage() {
             </div>
 
             {/* Members Roster List */}
-            <div className="space-y-3">
-              {filteredMembers.map((member) => {
-                const isHigh = member.riskLevel === 'High'
-                const isMedium = member.riskLevel === 'Medium'
+            {loading ? (
+              <div className="py-12 text-center text-muted text-xs font-medium">
+                Loading real-time MongoDB AI risk telemetry...
+              </div>
+            ) : filteredMembers.length === 0 ? (
+              <div className="py-12 text-center text-muted text-xs font-medium">
+                No members found matching your filter criteria.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredMembers.map((member) => {
+                  const isHigh = member.riskLevel === 'High'
+                  const isMedium = member.riskLevel === 'Medium'
 
-                return (
-                  <div
-                    key={member.id}
-                    className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-[14px] border border-border/80 bg-background p-4 transition-all hover:border-border hover:shadow-xs"
-                  >
-                    {/* Left Info Column */}
-                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold text-white shadow-xs">
-                        {member.avatarInitials}
-                      </span>
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-[14px] border border-border/80 bg-background p-4 transition-all hover:border-border hover:shadow-xs"
+                    >
+                      {/* Left Info Column */}
+                      <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold text-white shadow-xs">
+                          {member.avatarInitials}
+                        </span>
 
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className="text-base font-bold text-navy">{member.name}</span>
-                          <span className="font-mono text-xs text-muted-foreground bg-card px-2 py-0.5 rounded-md border border-border">
-                            {member.id}
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className="text-base font-bold text-navy">{member.name}</span>
+                            <span className="font-mono text-xs text-muted-foreground bg-card px-2 py-0.5 rounded-md border border-border">
+                              {member.id}
+                            </span>
+
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+                                isHigh
+                                  ? 'border border-rose-500/20 bg-rose-500/10 text-rose-700'
+                                  : isMedium
+                                  ? 'border border-amber-500/20 bg-amber-500/10 text-amber-700'
+                                  : 'border border-emerald/20 bg-emerald/10 text-emerald-dark'
+                              }`}
+                            >
+                              {isHigh ? (
+                                <ShieldAlert className="h-3 w-3" />
+                              ) : isMedium ? (
+                                <AlertTriangle className="h-3 w-3" />
+                              ) : (
+                                <CheckCircle2 className="h-3 w-3" />
+                              )}
+                              {member.riskLevel} Risk
+                            </span>
+                          </div>
+
+                          {/* Signals List */}
+                          <ul className="space-y-1 pt-1">
+                            {member.riskReasons.map((reason, i) => (
+                              <li key={i} className="flex items-center gap-2 text-xs text-navy-soft font-medium">
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                                    isHigh ? 'bg-rose-500' : isMedium ? 'bg-amber-500' : 'bg-emerald'
+                                  }`}
+                                />
+                                <span>{reason}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* Middle Metrics Column */}
+                      <div className="flex items-center gap-4 py-2 lg:py-0 border-y lg:border-y-0 border-border/60 text-xs shrink-0">
+                        <div className="text-center px-3">
+                          <span className="text-[10px] font-semibold text-muted uppercase tracking-wider block">
+                            Late / Missed
                           </span>
-
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-                              isHigh
-                                ? 'border border-rose-500/20 bg-rose-500/10 text-rose-700'
-                                : isMedium
-                                ? 'border border-amber-500/20 bg-amber-500/10 text-amber-700'
-                                : 'border border-emerald/20 bg-emerald/10 text-emerald-dark'
-                            }`}
-                          >
-                            {isHigh ? (
-                              <ShieldAlert className="h-3 w-3" />
-                            ) : isMedium ? (
-                              <AlertTriangle className="h-3 w-3" />
-                            ) : (
-                              <CheckCircle2 className="h-3 w-3" />
-                            )}
-                            {member.riskLevel} Risk
+                          <span className="font-bold text-navy text-sm">
+                            {member.latePayments} / {member.missedPayments}
                           </span>
                         </div>
+                        <div className="h-8 w-px bg-border" />
+                        <div className="text-center px-3">
+                          <span className="text-[10px] font-semibold text-muted uppercase tracking-wider block">
+                            Pending Amount
+                          </span>
+                          <span className={`font-mono font-bold text-sm ${member.outstandingAmount > 0 ? 'text-amber-600' : 'text-emerald-dark'}`}>
+                            ₹{member.outstandingAmount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
 
-                        {/* Signals List */}
-                        <ul className="space-y-1 pt-1">
-                          {member.riskReasons.map((reason, i) => (
-                            <li key={i} className="flex items-center gap-2 text-xs text-navy-soft font-medium">
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                                  isHigh ? 'bg-rose-500' : isMedium ? 'bg-amber-500' : 'bg-emerald'
-                                }`}
-                              />
-                              <span>{reason}</span>
-                            </li>
-                          ))}
-                        </ul>
+                      {/* Right Actions Column */}
+                      <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+                        <button
+                          onClick={() => setSelectedMember(member)}
+                          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-200/70 transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Explain Risk with AI
+                        </button>
+
+                        <Link
+                          to={`/members/${member.id}`}
+                          className="inline-flex items-center gap-1 h-9 px-3.5 rounded-[10px] bg-card hover:bg-background text-navy text-xs font-semibold border border-border transition-colors"
+                        >
+                          <span>View Member</span>
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Link>
                       </div>
                     </div>
-
-                    {/* Middle Metrics Column */}
-                    <div className="flex items-center gap-4 py-2 lg:py-0 border-y lg:border-y-0 border-border/60 text-xs shrink-0">
-                      <div className="text-center px-3">
-                        <span className="text-[10px] font-semibold text-muted uppercase tracking-wider block">
-                          Late / Missed
-                        </span>
-                        <span className="font-bold text-navy text-sm">
-                          {member.latePayments} / {member.missedPayments}
-                        </span>
-                      </div>
-                      <div className="h-8 w-px bg-border" />
-                      <div className="text-center px-3">
-                        <span className="text-[10px] font-semibold text-muted uppercase tracking-wider block">
-                          Pending Amount
-                        </span>
-                        <span className={`font-mono font-bold text-sm ${member.outstandingAmount > 0 ? 'text-amber-600' : 'text-emerald-dark'}`}>
-                          ₹{member.outstandingAmount.toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Right Actions Column */}
-                    <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
-                      <button
-                        onClick={() => setSelectedMember(member)}
-                        className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-200/70 transition-colors cursor-pointer"
-                      >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Explain Risk with AI
-                      </button>
-
-                      <Link
-                        to={`/members/${member.id}`}
-                        className="inline-flex items-center gap-1 h-9 px-3.5 rounded-[10px] bg-card hover:bg-background text-navy text-xs font-semibold border border-border transition-colors"
-                      >
-                        <span>View Member</span>
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </main>
       </div>

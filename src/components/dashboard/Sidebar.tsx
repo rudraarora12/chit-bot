@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { LayoutDashboard, Users, Gavel, ShieldAlert, Settings, X, Bot } from 'lucide-react'
+=======
+import { LayoutDashboard, Users, Gavel, ShieldAlert, SlidersHorizontal, X } from 'lucide-react'
+>>>>>>> origin/main
 import { Link, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/landing/Logo'
 
@@ -12,8 +16,12 @@ const navItems = [
   { label: 'Members', href: '/members', icon: Users },
   { label: 'Auction & Ledger', href: '/auction', icon: Gavel },
   { label: 'Risk Monitoring', href: '/risk', icon: ShieldAlert },
+<<<<<<< HEAD
   { label: 'AI Assistant', href: '/assistant', icon: Bot },
   { label: 'Settings', href: '/settings', icon: Settings },
+=======
+  { label: 'Group Controls', href: '/settings', icon: SlidersHorizontal },
+>>>>>>> origin/main
 ]
 
 export function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarProps) {
